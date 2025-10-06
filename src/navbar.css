@@ -1,0 +1,141 @@
+/* Bottom Navigation Bar */
+
+.bottom-navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 3px solid #f8bbd0;
+  box-shadow: 0 -4px 20px rgba(233, 30, 99, 0.2);
+  padding: 0;
+  z-index: 1000;
+}
+
+.navbar-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  height: 70px;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  text-decoration: none;
+  color: #666;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border-radius: 0;
+  padding: 0;
+  border-right: 1px solid #f0f0f0;
+}
+
+.nav-item:last-child {
+  border-right: none;
+}
+
+.nav-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+  order: 2;
+}
+
+.nav-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  order: 1;
+}
+
+/* Rainbow background colors for each nav item - VIBRANT solid boxes */
+.nav-item:nth-child(1):hover {
+  background: #ff6b9d;
+  color: #fff;
+}
+
+.nav-item:nth-child(2):hover {
+  background: #ff9a76;
+  color: #fff;
+}
+
+.nav-item:nth-child(3):hover {
+  background: #ffd93d;
+  color: #fff;
+}
+
+.nav-item:nth-child(4):hover {
+  background: #6ee7b7;
+  color: #fff;
+}
+
+.nav-item:nth-child(5):hover {
+  background: #38bdf8;
+  color: #fff;
+}
+
+.nav-item:nth-child(6):hover {
+  background: #a78bfa;
+  color: #fff;
+}
+
+.nav-item:nth-child(7):hover {
+  background: #f472b6;
+  color: #fff;
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1);
+}
+
+/* Active state - matches VIBRANT rainbow colors */
+.nav-item:nth-child(1).active {
+  background: #ff6b9d;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-item:nth-child(2).active {
+  background: #ff9a76;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-item:nth-child(3).active {
+  background: #ffd93d;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-item:nth-child(4).active {
+  background: #6ee7b7;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-item:nth-child(5).active {
+  background: #38bdf8;
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-item:nth-child(6).active {
+  background: #a78bfa;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Adjust body padding to account for fixed bottom navbar */
+body {
+  padding-bottom: 80px;
+}

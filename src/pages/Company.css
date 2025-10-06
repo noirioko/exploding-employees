@@ -1,0 +1,88 @@
+/* Browser-style tabs for sub-navigation */
+.browser-tabs {
+  display: flex;
+  gap: 4px;
+  background: #f0f0f0;
+  padding: 10px 10px 0 10px;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 20px;
+}
+
+.browser-tab {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s ease;
+  position: relative;
+  min-width: 120px;
+  text-align: center;
+  outline: none;
+}
+
+.browser-tab:focus {
+  outline: none;
+}
+
+.browser-tab:hover {
+  background: #fafafa;
+  color: #333;
+}
+
+.browser-tab.active {
+  background: linear-gradient(135deg, #fff0f5 0%, #ffe4f1 100%);
+  border-color: #f8bbd0;
+  color: #e91e63;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(233, 30, 99, 0.1);
+}
+
+.browser-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(135deg, #fff0f5 0%, #ffe4f1 100%);
+}
+
+.tab-content {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.marathon-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.marathon-title {
+  font-size: 28px;
+  font-weight: 900;
+  color: #e91e63;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.marathon-subtitle {
+  font-size: 14px;
+  color: #999;
+  margin-top: 8px;
+  font-style: italic;
+}

@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explosion Test - Isolated</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            min-height: 100vh;
+        }
+
+        /* Test buttons - FIXED position, should NEVER move */
+        .test-buttons {
+            position: fixed;
+            top: 20px;
+            right: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 10002;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .test-buttons button {
+            padding: 10px 15px;
+            font-size: 12px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .test-buttons button:hover {
+            background: #d32f2f;
+        }
+
+        /* Yuwon in bottom-right corner */
+        .yuwon-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            z-index: 9999;
+            transition: opacity 0.05s ease-out;
+        }
+
+        .yuwon-container.fade-out-fast {
+            opacity: 0;
+        }
+
+        /* Sprite explosion effect */
+        .sprite-piece {
+            position: fixed;
+            background-size: cover;
+            pointer-events: none;
+            z-index: 10001;
+        }
+
+        @keyframes sprite-explode {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) rotate(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: var(--piece-direction) rotate(var(--piece-rotation));
+            }
+        }
+
+        .yuwon-image {
+            width: 116px; /* 105 * 1.1 = 115.5, rounded to 116 */
+            height: auto;
+            cursor: pointer;
+            image-rendering: pixelated;
+        }
+
+        /* Animation keyframes - balloon inflation shake */
+        @keyframes enlargeAndTremble {
+            /* Slowly inflate */
+            0% { transform: scale(1) translate(0, 0); }
+            2% { transform: scale(1.02) translate(2px, -3px); }
+            4% { transform: scale(1.04) translate(-3px, 1px); }
+            6% { transform: scale(1.06) translate(1px, 3px); }
+            8% { transform: scale(1.08) translate(3px, -1px); }
+            10% { transform: scale(1.1) translate(-2px, -2px); }
+            12% { transform: scale(1.12) translate(3px, 2px); }
+            14% { transform: scale(1.14) translate(-1px, -3px); }
+            16% { transform: scale(1.16) translate(-3px, 3px); }
+            18% { transform: scale(1.18) translate(2px, 1px); }
+
+            /* Pause at mid-size */
+            20% { transform: scale(1.2) translate(-2px, 3px); }
+            22% { transform: scale(1.2) translate(3px, -2px); }
+            24% { transform: scale(1.2) translate(1px, -1px); }
+            26% { transform: scale(1.2) translate(-3px, -2px); }
+            28% { transform: scale(1.2) translate(2px, 3px); }
+            30% { transform: scale(1.2) translate(3px, 1px); }
+
+            /* Deflate a bit */
+            32% { transform: scale(1.18) translate(-1px, 2px); }
+            34% { transform: scale(1.16) translate(-3px, -1px); }
+            36% { transform: scale(1.14) translate(1px, -3px); }
+            38% { transform: scale(1.12) translate(3px, 3px); }
+            40% { transform: scale(1.1) translate(-2px, 1px); }
+
+            /* RAPID INFLATE TO MAX */
+            42% { transform: scale(1.15) translate(2px, -2px); }
+            44% { transform: scale(1.2) translate(-3px, 2px); }
+            46% { transform: scale(1.25) translate(3px, -3px); }
+            48% { transform: scale(1.3) translate(-1px, 1px); }
+            50% { transform: scale(1.35) translate(2px, 2px); }
+
+            /* Vibrate at max size (about to pop!) */
+            52% { transform: scale(1.36) translate(-3px, -3px); }
+            54% { transform: scale(1.37) translate(3px, -1px); }
+            56% { transform: scale(1.38) translate(1px, 3px); }
+            58% { transform: scale(1.39) translate(-2px, -1px); }
+            60% { transform: scale(1.4) translate(3px, 2px); }
+            62% { transform: scale(1.41) translate(-1px, -2px); }
+            64% { transform: scale(1.42) translate(-3px, 1px); }
+            66% { transform: scale(1.43) translate(2px, -3px); }
+            68% { transform: scale(1.44) translate(1px, 2px); }
+            70% { transform: scale(1.45) translate(-2px, 3px); }
+
+            /* MAX PRESSURE - extreme vibration */
+            72% { transform: scale(1.46) translate(4px, -4px); }
+            74% { transform: scale(1.47) translate(-4px, -2px); }
+            76% { transform: scale(1.48) translate(3px, 4px); }
+            78% { transform: scale(1.49) translate(-3px, -4px); }
+            80% { transform: scale(1.5) translate(4px, 3px); }
+            82% { transform: scale(1.51) translate(-4px, -3px); }
+            84% { transform: scale(1.52) translate(2px, -4px); }
+            86% { transform: scale(1.53) translate(-2px, 4px); }
+            88% { transform: scale(1.54) translate(4px, -2px); }
+            90% { transform: scale(1.55) translate(-4px, 2px); }
+            92% { transform: scale(1.56) translate(3px, 4px); }
+            94% { transform: scale(1.57) translate(-3px, -4px); }
+            96% { transform: scale(1.58) translate(4px, 3px); }
+            98% { transform: scale(1.59) translate(-4px, -3px); }
+            100% { transform: scale(1.6) translate(0, 0); }
+        }
+
+        .enlarge-and-tremble {
+            animation: enlargeAndTremble 1s ease-in-out forwards; /* Reduced to 1 second */
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Explosion overlay - fullscreen */
+        .explosion-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10000;
+            pointer-events: none;
+            background: transparent;
+            opacity: 0;
+            transition: opacity 0.1s ease-in;
+        }
+
+        .explosion-overlay.visible {
+            opacity: 1;
+        }
+
+        .explosion-overlay.fade-out {
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .explosion-gif {
+            position: fixed;
+            /* Position will be set via JS */
+            width: 308px; /* 280 * 1.1 = 308 */
+            height: 308px;
+            image-rendering: pixelated;
+            z-index: 10001;
+        }
+
+        /* Confetti */
+        .confetti {
+            position: fixed;
+            width: 8px; /* 7 * 1.1 = 7.7, rounded to 8 */
+            height: 8px;
+            z-index: 10001;
+            pointer-events: none;
+            border-radius: 2px; /* Make them squares, not circles */
+        }
+
+        @keyframes confetti-explode {
+            0% {
+                transform: translate(0, 0) rotate(0deg) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: var(--confetti-direction) rotate(720deg) scale(0.5);
+                opacity: 0;
+            }
+        }
+
+        /* Death screen styles - Elden Ring style (bottom-right corner) */
+        .death-screen {
+            position: fixed;
+            bottom: 90px;
+            right: 40px;
+            z-index: 10003;
+            pointer-events: none;
+            opacity: 0;
+            animation: death-fade-in 2.5s ease-out forwards;
+        }
+
+        .death-box {
+            position: relative;
+            background: rgba(20, 0, 0, 0.95);
+            padding: 20px 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            -webkit-mask-image:
+                linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%),
+                linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%);
+            -webkit-mask-composite: source-in;
+            mask-image:
+                linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%),
+                linear-gradient(to right, transparent 0%, black 30%, black 70%, transparent 100%);
+            mask-composite: intersect;
+        }
+
+        .death-text {
+            font-family: 'Times New Roman', serif;
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B0000;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .timer-text {
+            font-family: 'Times New Roman', serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: #CC0000;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+            letter-spacing: 1px;
+        }
+
+        @keyframes death-fade-in {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes death-fade-out {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        @keyframes spin-in-grow {
+            0% {
+                transform: rotate(-1440deg) scale(0);
+                opacity: 0;
+            }
+            70% {
+                transform: rotate(0deg) scale(1.3);
+                opacity: 1;
+            }
+            85% {
+                transform: rotate(0deg) scale(1.35);
+                opacity: 1;
+            }
+            100% {
+                transform: rotate(0deg) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .spin-in {
+            animation: spin-in-grow 0.8s ease-out forwards;
+        }
+
+        /* Warning dialogue */
+        .warning-dialogue {
+            position: absolute;
+            bottom: 120%;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border: 3px solid #e91e63;
+            border-radius: 16px;
+            padding: 12px 16px;
+            max-width: 250px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            animation: dialogueFadeIn 0.3s ease-out;
+            white-space: pre-wrap;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            z-index: 10004;
+        }
+
+        @keyframes dialogueFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-buttons">
+        <button onclick="testExplosion()">🔥 TEST EXPLOSION</button>
+        <button onclick="reset()">🔄 RESET</button>
+    </div>
+
+    <div class="yuwon-container" id="yuwonContainer">
+        <img
+            src="public/images/working_employees/corneryuwon_superangry.png"
+            alt="Yuwon"
+            class="yuwon-image"
+            id="yuwonImage"
+        >
+    </div>
+
+    <audio id="explosionSound" preload="auto">
+        <source src="public/sounds/roblox-explosion-sound.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let isExploding = false;
+
+        async function testExplosion() {
+            if (isExploding) return;
+            isExploding = true;
+
+            const yuwonImage = document.getElementById('yuwonImage');
+            const yuwonContainer = document.getElementById('yuwonContainer');
+
+            console.log('Step 1: Starting explosion sequence');
+
+            // STEP 1: Enlarge and tremble (1s)
+            console.log('Step 1a: Adding enlarge-and-tremble class');
+            yuwonImage.classList.add('enlarge-and-tremble');
+
+            await sleep(400); // Wait 400ms (0.4s)
+
+            // STEP 1b: Play sound early (while still shaking)
+            console.log('Step 1b: Playing sound early');
+            const sound = document.getElementById('explosionSound');
+            sound.volume = 0.3;
+            sound.currentTime = 0;
+            sound.play().catch(err => console.log('Sound failed:', err));
+
+            await sleep(550); // Continue shake
+
+            // STEP 1c: Change to crying sprite while still shaking
+            console.log('Step 1c: Changing to crying sprite');
+            yuwonImage.src = 'public/images/working_employees/corneryuwon_verysad.png';
+
+            await sleep(50); // Wait for shake to complete
+
+            // STEP 2: Capture Yuwon's position
+            console.log('Step 2: Capturing Yuwon position');
+            const rect = yuwonImage.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            console.log(`Yuwon center: ${centerX}, ${centerY}`);
+
+            // STEP 3: Create explosion overlay AND start fading Yuwon simultaneously
+            console.log('Step 3: Creating explosion overlay AND fading Yuwon simultaneously');
+            const overlay = document.createElement('div');
+            overlay.className = 'explosion-overlay';
+            overlay.id = 'explosionOverlay';
+
+            // Create explosion GIF
+            const explosionGif = document.createElement('img');
+            explosionGif.src = `public/images/working_employees/explode.gif?t=${Date.now()}`;
+            explosionGif.className = 'explosion-gif';
+            explosionGif.style.left = `${centerX}px`;
+            explosionGif.style.top = `${centerY - 100}px`;
+            explosionGif.style.transform = 'translate(-50%, -50%)';
+
+            console.log('GIF src:', explosionGif.src);
+            console.log('GIF position:', explosionGif.style.left, explosionGif.style.top);
+
+            overlay.appendChild(explosionGif);
+            document.body.appendChild(overlay);
+
+            // Trigger fade-in
+            requestAnimationFrame(() => {
+                overlay.classList.add('visible');
+            });
+
+            // STEP 4: SIMULTANEOUSLY fade out Yuwon (not hide, just fade)
+            console.log('Step 4: Fading out Yuwon while GIF plays');
+            yuwonContainer.classList.add('fade-out-fast');
+
+            await sleep(50); // Wait for fade
+            yuwonContainer.classList.add('hidden');
+
+            // STEP 5: Create confetti from Yuwon's position
+            console.log('Step 5: Creating confetti');
+            createConfetti(centerX, centerY);
+
+            // STEP 6: Show death screen (1s after Yuwon is gone)
+            await sleep(1000); // 1 second delay
+            console.log('Step 6: Showing death screen');
+            showDeathScreen();
+
+            // STEP 7: Remove overlay immediately (no delay)
+            await sleep(100); // Very brief delay
+            console.log('Step 7: Removing overlay immediately');
+            overlay.remove();
+
+            // Don't set isExploding to false - let bringBackYuwon handle it
+            console.log('Explosion complete! Waiting for revival...');
+        }
+
+        function explodeSprite(imageElement, centerX, centerY) {
+            const rect = imageElement.getBoundingClientRect();
+            const pieceSize = 20; // Size of each piece
+            const cols = Math.ceil(rect.width / pieceSize);
+            const rows = Math.ceil(rect.height / pieceSize);
+
+            console.log(`Exploding sprite into ${cols * rows} pieces`);
+
+            // Create a canvas to capture the image
+            const canvas = document.createElement('canvas');
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(imageElement, 0, 0, rect.width, rect.height);
+
+            // Create pieces
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'sprite-piece';
+
+                    const x = col * pieceSize;
+                    const y = row * pieceSize;
+
+                    // Extract piece from canvas
+                    const pieceCanvas = document.createElement('canvas');
+                    pieceCanvas.width = pieceSize;
+                    pieceCanvas.height = pieceSize;
+                    const pieceCtx = pieceCanvas.getContext('2d');
+                    pieceCtx.drawImage(canvas, x, y, pieceSize, pieceSize, 0, 0, pieceSize, pieceSize);
+
+                    piece.style.width = pieceSize + 'px';
+                    piece.style.height = pieceSize + 'px';
+                    piece.style.left = (rect.left + x) + 'px';
+                    piece.style.top = (rect.top + y) + 'px';
+                    piece.style.backgroundImage = `url(${pieceCanvas.toDataURL()})`;
+
+                    // Calculate explosion direction from center
+                    const pieceCenterX = rect.left + x + pieceSize / 2;
+                    const pieceCenterY = rect.top + y + pieceSize / 2;
+                    const angle = Math.atan2(pieceCenterY - centerY, pieceCenterX - centerX);
+                    const distance = 150 + Math.random() * 150;
+                    const deltaX = Math.cos(angle) * distance;
+                    const deltaY = Math.sin(angle) * distance;
+                    const rotation = (Math.random() - 0.5) * 720; // Random rotation
+
+                    piece.style.setProperty('--piece-direction', `translate(${deltaX}px, ${deltaY}px)`);
+                    piece.style.setProperty('--piece-rotation', `${rotation}deg`);
+                    piece.style.animation = 'sprite-explode 0.8s ease-out forwards';
+                    piece.style.animationDelay = Math.random() * 0.05 + 's';
+
+                    document.body.appendChild(piece);
+
+                    // Remove after animation
+                    setTimeout(() => {
+                        if (piece.parentNode) {
+                            piece.remove();
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
+        let reviveTimer = null;
+
+        function showDeathScreen() {
+            const deathScreen = document.createElement('div');
+            deathScreen.className = 'death-screen';
+            deathScreen.id = 'deathScreen';
+
+            // Death box with blurred edges
+            const deathBox = document.createElement('div');
+            deathBox.className = 'death-box';
+
+            // Death text
+            const deathText = document.createElement('div');
+            deathText.className = 'death-text';
+            deathText.textContent = 'HE DIED';
+
+            // Timer text
+            const timerText = document.createElement('div');
+            timerText.className = 'timer-text';
+            timerText.id = 'timerText';
+            timerText.textContent = 'Reviving in 10s...';
+
+            deathBox.appendChild(deathText);
+            deathBox.appendChild(timerText);
+            deathScreen.appendChild(deathBox);
+            document.body.appendChild(deathScreen);
+
+            // Start countdown timer
+            let countdown = 10;
+            reviveTimer = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    timerText.textContent = `Reviving in ${countdown}s...`;
+                } else {
+                    clearInterval(reviveTimer);
+                    timerText.textContent = 'Reviving now...';
+                }
+            }, 1000);
+
+            // Auto-revive after 10 seconds
+            setTimeout(() => {
+                deathScreen.style.animation = 'death-fade-out 0.5s ease-out forwards';
+                setTimeout(() => {
+                    if (deathScreen.parentNode) {
+                        deathScreen.remove();
+                    }
+                    bringBackYuwon();
+                }, 500);
+            }, 10000);
+        }
+
+        function bringBackYuwon() {
+            const yuwonContainer = document.getElementById('yuwonContainer');
+            const yuwonImage = document.getElementById('yuwonImage');
+
+            console.log('Bringing Yuwon back!');
+
+            // Remove any leftover classes first
+            yuwonImage.classList.remove('enlarge-and-tremble', 'spin-in');
+
+            // Change to angry sprite
+            yuwonImage.src = 'public/images/working_employees/corneryuwon_superangry.png';
+
+            // Show with spin-in animation
+            yuwonContainer.classList.remove('hidden', 'fade-out-fast');
+
+            // Force reflow to restart animation
+            void yuwonImage.offsetWidth;
+
+            yuwonImage.classList.add('spin-in');
+
+            // Show warning dialogue
+            const dialogue = document.createElement('div');
+            dialogue.className = 'warning-dialogue';
+            dialogue.textContent = "Don't you DARE do that again!";
+            yuwonContainer.appendChild(dialogue);
+
+            // Remove spin-in class and dialogue after animation
+            setTimeout(() => {
+                yuwonImage.classList.remove('spin-in');
+                if (dialogue.parentNode) {
+                    dialogue.style.animation = 'death-fade-out 0.3s ease-out forwards';
+                    setTimeout(() => {
+                        if (dialogue.parentNode) {
+                            dialogue.remove();
+                        }
+                    }, 300);
+                }
+                isExploding = false;
+            }, 3500);
+        }
+
+        function createConfetti(centerX, centerY) {
+            const colors = ['#ff0000', '#ff4444', '#ff6666', '#cc0000', '#ff8888'];
+            const confettiCount = 40;
+
+            console.log(`Creating ${confettiCount} confetti pieces from ${centerX}, ${centerY}`);
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = centerX + 'px';
+                confetti.style.top = centerY + 'px';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                // Mix of circles and squares
+                if (i % 5 === 0) {
+                    confetti.style.borderRadius = '50%';
+                } else if (i % 3 === 0) {
+                    confetti.style.borderRadius = '2px';
+                } else {
+                    confetti.style.borderRadius = '0';
+                }
+
+                // Calculate explosion direction
+                const angle = (Math.PI * 2 * i) / confettiCount + (Math.random() - 0.5) * 0.5;
+                const distance = 150 + Math.random() * 200;
+                const deltaX = Math.cos(angle) * distance;
+                const deltaY = Math.sin(angle) * distance;
+
+                confetti.style.setProperty('--confetti-direction', `translate(${deltaX}px, ${deltaY}px)`);
+                confetti.style.animation = 'confetti-explode 2s ease-out forwards';
+                confetti.style.animationDelay = Math.random() * 0.3 + 's';
+
+                document.body.appendChild(confetti);
+
+                // Remove after animation
+                setTimeout(() => {
+                    if (confetti.parentNode) {
+                        confetti.remove();
+                    }
+                }, 3000);
+            }
+        }
+
+        function reset() {
+            console.log('Resetting...');
+            const yuwonImage = document.getElementById('yuwonImage');
+            const yuwonContainer = document.getElementById('yuwonContainer');
+
+            // Clear any timers
+            if (reviveTimer) {
+                clearInterval(reviveTimer);
+                reviveTimer = null;
+            }
+
+            // Remove any overlays
+            const overlay = document.getElementById('explosionOverlay');
+            if (overlay) overlay.remove();
+
+            // Remove all confetti, sprite pieces, and death screen
+            document.querySelectorAll('.confetti').forEach(c => c.remove());
+            document.querySelectorAll('.sprite-piece').forEach(p => p.remove());
+            const deathScreen = document.getElementById('deathScreen');
+            if (deathScreen) deathScreen.remove();
+
+            // Remove any warning dialogues
+            document.querySelectorAll('.warning-dialogue').forEach(d => d.remove());
+
+            // Show Yuwon again
+            yuwonContainer.classList.remove('hidden', 'fade-out-fast');
+            yuwonImage.classList.remove('enlarge-and-tremble', 'spin-in');
+            yuwonImage.src = 'public/images/working_employees/corneryuwon_superangry.png'; // Reset to superangry
+
+            isExploding = false;
+            console.log('Reset complete!');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        console.log('Explosion test page loaded');
+        console.log('Click "TEST EXPLOSION" button to test');
+        console.log('Watch console for step-by-step debugging');
+    </script>
+</body>
+</html>

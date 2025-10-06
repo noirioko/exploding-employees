@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(git -C \"C:\\Users\\livia\\OneDrive\\Desktop\\exploding-employees\\exploding-employees\\exploding-employees-react\" diff src/data/cards.js)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
