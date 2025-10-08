@@ -28,6 +28,27 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  cursor: url('/images/ui/cursors/cursor.cur'), auto;
+}
+
+* {
+  cursor: url('/images/ui/cursors/cursor.cur'), auto;
+}
+
+a, button {
+  cursor: url('/images/ui/cursors/cursor_Link.cur'), pointer !important;
+}
+
+input, textarea {
+  cursor: url('/images/ui/cursors/cursor_Text.cur'), text !important;
+}
+
+[disabled], .disabled {
+  cursor: url('/images/ui/cursors/cursor_Unavailable.cur'), not-allowed !important;
+}
+
+[title], .info-icon, .help {
+  cursor: url('/images/ui/cursors/cursor_Help.cur'), help !important;
 }
 
 h1 {

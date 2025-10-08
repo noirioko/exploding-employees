@@ -16,7 +16,10 @@ function SpriteAnimation({
   // Load sprite sheet image
   useEffect(() => {
     const img = new Image();
-    img.onload = () => setSpriteImage(img);
+    img.onload = () => {
+      setSpriteImage(img);
+      setCurrentFrame(0); // Reset animation when sprite sheet changes
+    };
     img.src = spriteSheet;
   }, [spriteSheet]);
 

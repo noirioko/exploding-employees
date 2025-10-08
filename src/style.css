@@ -1322,21 +1322,27 @@ body {
 
 .close-btn {
   background: none;
-  border: none;
-  font-size: 32px;
+  border: none !important;
+  font-size: 24px;
   cursor: pointer;
   color: #999;
   line-height: 1;
-  padding: 0;
+  padding: 0 !important;
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .close-btn:hover {
-  color: #333;
+  color: #e91e63;
+  transform: scale(1.1) rotate(90deg);
+  background: rgba(233, 30, 99, 0.1);
+  border-radius: 50%;
 }
 
 .form-group {

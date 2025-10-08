@@ -2,25 +2,24 @@
 .browser-tabs {
   display: flex;
   gap: 4px;
-  background: #f0f0f0;
-  padding: 10px 10px 0 10px;
-  border-bottom: 2px solid #e0e0e0;
-  margin-bottom: 20px;
+  background: #e6e0f5;
+  padding: 8px 8px 0 8px;
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .browser-tab {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-bottom: none;
+  background: #f0ebf8;
+  border: none;
   border-radius: 8px 8px 0 0;
-  padding: 10px 20px;
+  padding: 12px 24px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: #666;
-  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 600;
+  color: #7b68a0;
+  transition: all 0.25s ease;
   position: relative;
-  min-width: 120px;
+  min-width: 140px;
   text-align: center;
   outline: none;
 }
@@ -30,26 +29,24 @@
 }
 
 .browser-tab:hover {
-  background: #fafafa;
-  color: #333;
+  background: #ffffff;
+  color: #6b5b8e;
 }
 
 .browser-tab.active {
-  background: linear-gradient(135deg, #fff0f5 0%, #ffe4f1 100%);
-  border-color: #f8bbd0;
-  color: #e91e63;
-  font-weight: 600;
-  box-shadow: 0 -2px 8px rgba(233, 30, 99, 0.1);
+  background: #ffffff;
+  color: #5b4a7d;
+  font-weight: 700;
 }
 
 .browser-tab.active::after {
   content: '';
   position: absolute;
-  bottom: -2px;
+  bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(135deg, #fff0f5 0%, #ffe4f1 100%);
+  background: #ffffff;
 }
 
 .tab-content {

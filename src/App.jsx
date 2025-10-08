@@ -6,6 +6,7 @@ import Record from './pages/Record';
 import Company from './pages/Company';
 import Story from './pages/Story';
 import Room from './pages/Room';
+import Supermarket from './pages/Supermarket';
 import Paycheck from './pages/Paycheck';
 import SelfCare from './pages/SelfCare';
 import RoomDecorHelper from './pages/RoomDecorHelper';
@@ -16,8 +17,10 @@ import SpriteSheetViewer from './pages/SpriteSheetViewer';
 import ExplosionTest from './pages/ExplosionTest';
 import AnimationTest from './pages/AnimationTest';
 import AnimationTestNew from './pages/AnimationTestNew';
+import NoahWalkingTest from './pages/NoahWalkingTest';
 import Header from './components/Header';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import FloatingEmployee from './components/FloatingEmployee';
 import { getCurrentSeason } from './config/seasonalConfig';
 import './style.css';
@@ -62,6 +65,7 @@ function App() {
               <Route path="/company" element={<Company />} />
               <Route path="/story" element={<Story />} />
               <Route path="/room" element={<Room />} />
+              <Route path="/supermarket" element={<Supermarket />} />
               <Route path="/paycheck" element={<Paycheck />} />
               <Route path="/selfcare" element={<SelfCare />} />
               <Route path="/room-helper" element={<RoomDecorHelper />} />
@@ -72,7 +76,9 @@ function App() {
               <Route path="/explosion-test" element={<ExplosionTest />} />
               <Route path="/animation-test" element={<AnimationTest />} />
               <Route path="/animation-test-new" element={<AnimationTestNew />} />
+              <Route path="/noah-walking-test" element={<NoahWalkingTest />} />
             </Routes>
+            <Footer />
             <Navbar />
           </div>
 

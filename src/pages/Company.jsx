@@ -1063,16 +1063,196 @@ function Company() {
       </div>
 
       <div className="content">
-        {/* Browser-style tabs */}
-        <div style={{ background: 'white', borderRadius: '15px', overflow: 'hidden', border: '3px solid #ffc1e3' }}>
-          {/* AXIS Logo and Header */}
+        {/* Browser-style window */}
+        <div style={{ background: 'white', borderRadius: '15px', overflow: 'hidden', border: '4px solid #d4c5f0' }}>
+
+          {/* Browser Tab Bar (Pink!) */}
           <div style={{
-            background: 'linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%)',
-            padding: '20px',
-            borderBottom: '2px solid #ddd',
+            background: 'linear-gradient(180deg, #ffc8dd 0%, #ffb3cc 100%)',
+            padding: '8px 12px 0 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '15px'
+            justifyContent: 'space-between',
+            gap: '12px',
+            minHeight: '48px'
+          }}>
+            {/* Fake Browser Tab with Chrome-style rounded corners */}
+            <div style={{
+              background: 'white',
+              borderRadius: '12px 12px 0 0',
+              padding: '10px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              minWidth: '200px',
+              position: 'relative',
+              zIndex: 1,
+              alignSelf: 'flex-end'
+            }}>
+              {/* Left curve */}
+              <img
+                src="/images/ui/round_corner_outward.png"
+                alt=""
+                style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '-11px',
+                  width: '12px',
+                  height: '12px',
+                  pointerEvents: 'none'
+                }}
+              />
+
+              {/* Right curve - flipped */}
+              <img
+                src="/images/ui/round_corner_outward.png"
+                alt=""
+                style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  right: '-12px',
+                  width: '12px',
+                  height: '12px',
+                  transform: 'scaleX(-1)',
+                  pointerEvents: 'none'
+                }}
+              />
+
+              <img
+                src="/images/ui/icon_axis_logo.png"
+                alt="favicon"
+                style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <span style={{ fontSize: '13px', fontWeight: '500', color: '#333' }}>AXIS Portal</span>
+            </div>
+
+            {/* Window Controls - centered in pink bar */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginLeft: 'auto',
+              alignItems: 'center'
+            }}>
+              <div style={{
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                background: '#baffc9',
+                border: '1px solid #99ffaa',
+                cursor: 'not-allowed'
+              }} title="Maximize" />
+              <div style={{
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                background: '#ffffba',
+                border: '1px solid #ffff99',
+                cursor: 'not-allowed'
+              }} title="Minimize" />
+              <div style={{
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                background: '#ffb3ba',
+                border: '1px solid #ff9999',
+                cursor: 'not-allowed'
+              }} title="Close" />
+            </div>
+          </div>
+
+          {/* Browser Navigation Bar */}
+          <div style={{
+            background: '#f8f8f8',
+            padding: '10px 15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            borderBottom: '1px solid #e0e0e0'
+          }}>
+            {/* Back/Forward/Refresh buttons */}
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                color: '#999',
+                userSelect: 'none'
+              }}>◀</div>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                color: '#999',
+                userSelect: 'none'
+              }}>▶</div>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                color: '#999',
+                userSelect: 'none'
+              }}>⟳</div>
+            </div>
+
+            {/* URL Bar */}
+            <div style={{
+              flex: 1,
+              background: 'white',
+              borderRadius: '20px',
+              padding: '8px 16px',
+              border: '1px solid #ddd',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{ fontSize: '14px', color: '#999' }}>🔒</span>
+              <span style={{ fontSize: '13px', color: '#333' }}>
+                axis-portal.com/{activeTab === 'achievement' ? 'achievement-marathon' :
+                                 activeTab === 'promotion' ? 'employee-promotion' :
+                                 activeTab === 'moral' ? 'employee-morale' :
+                                 'finance'}
+              </span>
+            </div>
+
+            {/* Bookmark Icon */}
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              background: 'white',
+              border: '1px solid #ddd',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'not-allowed',
+              fontSize: '16px'
+            }}>⭐</div>
+          </div>
+
+          {/* AXIS Logo and Header */}
+          <div style={{
+            background: '#e6e0f5',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '15px',
+            marginBottom: '0'
           }}>
             <img
               src="/images/ui/icon_axis_logo.png"
@@ -1081,10 +1261,12 @@ function Company() {
               onError={(e) => { e.target.style.display = 'none'; }}
             />
             <div>
-              <h2 style={{ margin: 0, fontSize: '24px', color: '#333' }}>AXIS Company Portal</h2>
-              <p style={{ fontSize: '13px', color: '#666', margin: '5px 0 0 0' }}>Employee Management System</p>
+              <h2 style={{ margin: 0, fontSize: '24px', color: '#5b4a7d' }}>AXIS Company Portal</h2>
+              <p style={{ fontSize: '13px', color: '#7b68a0', margin: '5px 0 0 0' }}>Employee Management System</p>
             </div>
           </div>
+
+          {/* Navigation Tabs */}
           <div className="browser-tabs">
             <button
               className={`browser-tab ${activeTab === 'achievement' ? 'active' : ''}`}

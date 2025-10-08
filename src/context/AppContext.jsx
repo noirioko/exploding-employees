@@ -59,6 +59,19 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   const [unlockedAUs, setUnlockedAUs] = useState(() => loadFromStorage('unlockedAUs', [])); // Array of AU IDs
   const [auProgress, setAuProgress] = useState(() => loadFromStorage('auProgress', {})); // {auId: {revealedSnippets: [indices], juiceSpent: amount}}
 
+  // Cooking & Inventory system
+  const [ingredients, setIngredients] = useState(() => loadFromStorage('ingredients', {})); // {itemId: quantity}
+  const [cookedDishes, setCookedDishes] = useState(() => loadFromStorage('cookedDishes', {})); // {recipeId: quantity}
+  const [discoveredRecipes, setDiscoveredRecipes] = useState(() => loadFromStorage('discoveredRecipes', [])); // Array of recipe IDs
+
+  // Friendship system
+  const [friendshipPoints, setFriendshipPoints] = useState(() => loadFromStorage('friendshipPoints', {
+    yuwon: 0,
+    noah: 0,
+    jaehyun: 0,
+    minkyu: 0
+  }));
+
   // Save to localStorage whenever state changes
   useEffect(() => {
     localStorage.setItem('tasks', JSON.stringify(tasks));
@@ -123,6 +136,22 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   useEffect(() => {
     localStorage.setItem('lastDate', JSON.stringify(lastDate));
   }, [lastDate]);
+
+  useEffect(() => {
+    localStorage.setItem('ingredients', JSON.stringify(ingredients));
+  }, [ingredients]);
+
+  useEffect(() => {
+    localStorage.setItem('cookedDishes', JSON.stringify(cookedDishes));
+  }, [cookedDishes]);
+
+  useEffect(() => {
+    localStorage.setItem('discoveredRecipes', JSON.stringify(discoveredRecipes));
+  }, [discoveredRecipes]);
+
+  useEffect(() => {
+    localStorage.setItem('friendshipPoints', JSON.stringify(friendshipPoints));
+  }, [friendshipPoints]);
 
   // Check if date has changed and clean up today's completed tasks
   useEffect(() => {
@@ -822,6 +851,89 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     return false;
   };
 
+  // Cooking & Inventory functions
+  const buyIngredient = (itemId, quantity = 1, price) => {
+    if (yuCash < price * quantity) return false; // Not enough money
+
+    setYuCash(prev => prev - (price * quantity));
+    setIngredients(prev => ({
+      ...prev,
+      [itemId]: (prev[itemId] || 0) + quantity
+    }));
+    return true;
+  };
+
+  const cookRecipe = (recipeId, recipe) => {
+    // Check if we have all ingredients
+    const hasIngredients = recipe.ingredients.every(reqIngredient => {
+      const playerAmount = ingredients[reqIngredient.id] || 0;
+      return playerAmount >= reqIngredient.amount;
+    });
+
+    if (!hasIngredients) return false;
+
+    // Deduct ingredients
+    const newIngredients = { ...ingredients };
+    recipe.ingredients.forEach(reqIngredient => {
+      newIngredients[reqIngredient.id] -= reqIngredient.amount;
+      if (newIngredients[reqIngredient.id] <= 0) {
+        delete newIngredients[reqIngredient.id];
+      }
+    });
+    setIngredients(newIngredients);
+
+    // Add cooked dish
+    setCookedDishes(prev => ({
+      ...prev,
+      [recipeId]: (prev[recipeId] || 0) + 1
+    }));
+
+    // Discover recipe if not already discovered
+    if (!discoveredRecipes.includes(recipeId)) {
+      setDiscoveredRecipes(prev => [...prev, recipeId]);
+    }
+
+    return true;
+  };
+
+  // Gift dish to character
+  const giftDish = (character, dishId) => {
+    // Remove one dish from inventory
+    const newDishes = { ...cookedDishes };
+    if (newDishes[dishId] && newDishes[dishId] > 0) {
+      newDishes[dishId] -= 1;
+      if (newDishes[dishId] <= 0) {
+        delete newDishes[dishId];
+      }
+      setCookedDishes(newDishes);
+      return true;
+    }
+    return false;
+  };
+
+  // Add friendship points
+  const addFriendshipPoints = (character, points) => {
+    setFriendshipPoints(prev => ({
+      ...prev,
+      [character]: Math.min(Math.max(prev[character] + points, 0), 2500) // Cap at 10 hearts (2500 points)
+    }));
+  };
+
+  const consumeDish = (recipeId, quantity = 1) => {
+    const currentAmount = cookedDishes[recipeId] || 0;
+    if (currentAmount < quantity) return false;
+
+    setCookedDishes(prev => {
+      const newDishes = { ...prev };
+      newDishes[recipeId] -= quantity;
+      if (newDishes[recipeId] <= 0) {
+        delete newDishes[recipeId];
+      }
+      return newDishes;
+    });
+    return true;
+  };
+
   const value = {
     tasks,
     completedTasks,
@@ -868,6 +980,18 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     seedTestRankData,
     unlockAU,
     revealSnippet,
+    ingredients,
+    setIngredients,
+    cookedDishes,
+    setCookedDishes,
+    discoveredRecipes,
+    setDiscoveredRecipes,
+    buyIngredient,
+    cookRecipe,
+    giftDish,
+    friendshipPoints,
+    addFriendshipPoints,
+    consumeDish,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

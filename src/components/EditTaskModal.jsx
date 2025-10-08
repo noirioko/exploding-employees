@@ -42,7 +42,7 @@ function EditTaskModal({ task, isOpen, onClose, onSave }) {
       <div className="modal-content">
         <div className="modal-header">
           <h3>✏️ Edit Task</h3>
-          <button className="close-btn" onClick={onClose}>&times;</button>
+          <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div className="form-group">
           <label>Task Description</label>

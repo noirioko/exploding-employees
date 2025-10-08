@@ -1,10 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { outfitsCatalog } from '../data/outfits';
-import SpriteAnimation from '../components/SpriteAnimation';
+import { placesConfig } from '../data/places';
+import { recipes, canCookRecipe, getRecipeById } from '../data/recipes';
+import { getItemById } from '../data/shopItems';
+import { getGiftReaction, getHeartCount } from '../data/giftPreferences';
 
 function Room() {
-  const { yuCash, setYuCash } = useApp();
+  const {
+    yuCash,
+    setYuCash,
+    ingredients,
+    cookedDishes,
+    discoveredRecipes,
+    cookRecipe,
+    giftDish,
+    friendshipPoints,
+    addFriendshipPoints
+  } = useApp();
+
+  const navigate = useNavigate();
 
   // Add CSS animations
   useEffect(() => {
@@ -18,70 +33,117 @@ function Room() {
         0%, 100% { transform: translate(-50%, -100%) translateY(0); }
         50% { transform: translate(-50%, -100%) translateY(-3px); }
       }
+      @keyframes bounceItem {
+        0%, 100% { transform: translateX(-50%) translateY(0); }
+        50% { transform: translateX(-50%) translateY(-3px); }
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
 
-
-  const [yuwonPosition, setYuwonPosition] = useState({ x: 320, y: 180 }); // Center of room
+  // Player state
+  const [yuwonPosition, setYuwonPosition] = useState({ x: 320, y: 180 });
   const [isWalking, setIsWalking] = useState(false);
-  const [direction, setDirection] = useState('down'); // 'up', 'down', 'left', 'right'
+  const [direction, setDirection] = useState('down');
   const [collisionZones, setCollisionZones] = useState([]);
-  const [hoveredInteractable, setHoveredInteractable] = useState(null); // 'stove' or 'fridge' or null
+
+  // Interaction state
+  const [hoveredInteractable, setHoveredInteractable] = useState(null);
   const [showVNDialogue, setShowVNDialogue] = useState(false);
-  const [vnDialogueType, setVNDialogueType] = useState(null); // 'stove' or 'fridge'
-  const [showCookingGame, setShowCookingGame] = useState(false);
-  const [showFridge, setShowFridge] = useState(false);
-  const [ingredients, setIngredients] = useState({ milk: 2, flour: 3, apple: 1 }); // Starting ingredients
+  const [vnDialogueType, setVNDialogueType] = useState(null); // 'noah', 'stove', 'fridge', 'table'
+  const [dialogueMode, setDialogueMode] = useState('menu'); // 'menu', 'talk'
 
-  // Friend invitation system
-  const [placedCharacters, setPlacedCharacters] = useState([]); // Array of {character, outfit, x, y, id}
-  const [ownedOutfits, setOwnedOutfits] = useState({
-    yuwon: ['yuwon_outfit_1'],
-    noah: ['noah_outfit_1'],
-    jaehyun: ['Jaehyun_outfit_1'],
-    minkyu: ['minkyu_outfit_1']
-  });
-  const [characterOutfits, setCharacterOutfits] = useState({
-    yuwon: 'yuwon_outfit_1',
-    noah: 'noah_outfit_1',
-    jaehyun: 'Jaehyun_outfit_1',
-    minkyu: 'minkyu_outfit_1'
-  });
+  // Modal state
+  const [showFridgeModal, setShowFridgeModal] = useState(false);
+  const [showStoveModal, setShowStoveModal] = useState(false);
+  const [showTableModal, setShowTableModal] = useState(false);
 
-  // Visual Helper Mode
-  const [helperMode, setHelperMode] = useState(false);
+  // Tooltip state
+  const [hoveredRecipe, setHoveredRecipe] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+
+  // Gifting system
+  const [heldItem, setHeldItem] = useState(null); // { type: 'dish', id: 'apple_pie', name: 'Apple Pie', image: '...' }
+  const [nearbyCharacter, setNearbyCharacter] = useState(null);
+  const [giftReaction, setGiftReaction] = useState(null);
+
+  // Visual helpers
+  const [showHelpers, setShowHelpers] = useState(false);
+  const [showHitbox, setShowHitbox] = useState(false);
+  const [showCoordinates, setShowCoordinates] = useState(false);
+
+  // Zone editor state
+  const [editMode, setEditMode] = useState(false);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState(null);
+  const [currentMouse, setCurrentMouse] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState(null);
-  const [editingName, setEditingName] = useState(null);
-  const [showCoordinates, setShowCoordinates] = useState(false);
-  const [isDrawingNew, setIsDrawingNew] = useState(false);
-  const [newZoneStart, setNewZoneStart] = useState(null);
-  const [currentMousePos, setCurrentMousePos] = useState(null);
-  const [showHitbox, setShowHitbox] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizeHandle, setResizeHandle] = useState(null);
+
+  // NPC dialogue messages
+  const noahMessages = [
+    "Your room is... quaint. Is that... plushies?",
+    "I suppose this is... cozy. For you.",
+    "Don't get used to me being here.",
+    "...It's not as bad as I thought it would be.",
+    "If you tell anyone I was here, I'll deny it."
+  ];
+  const [currentNoahMessage, setCurrentNoahMessage] = useState(0);
+
+  // Noah character state
+  const [noah, setNoah] = useState({
+    x: 54,
+    y: 112,
+    collisionWidth: 12,
+    collisionHeight: 12,
+    originalX: 54,
+    facingLeft: false,
+    isWalking: false,
+    direction: 'down'
+  });
+
+  // Refs for game loop
   const positionRef = useRef({ x: 320, y: 180 });
   const directionRef = useRef('down');
   const isWalkingRef = useRef(false);
+  const proximityCheckCounter = useRef(0);
+  const noahRef = useRef(noah);
+  const collisionZonesRef = useRef(collisionZones);
+  const nearbyCharacterRef = useRef(nearbyCharacter);
 
   // Room dimensions
   const roomWidth = 640;
   const roomHeight = 360;
 
-  // Interaction zones (stove and fridge)
+  // Interaction zones
   const interactionZones = {
-    stove: { left: 332, top: 90, width: 30, height: 42 }, // Zone 18
-    fridge: { left: 269, top: 75, width: 34, height: 55 }  // Zone 19 - moved down 5px from top, reduced height
+    stove: { left: 332, top: 90, width: 30, height: 42 },
+    fridge: { left: 269, top: 75, width: 34, height: 55 },
+    table: { left: 252, top: 147, width: 50, height: 40 }
   };
 
-  // Load collision zones from JSON file
+  // Sync refs with state
+  useEffect(() => {
+    noahRef.current = noah;
+  }, [noah]);
+
+  useEffect(() => {
+    collisionZonesRef.current = collisionZones;
+  }, [collisionZones]);
+
+  useEffect(() => {
+    nearbyCharacterRef.current = nearbyCharacter;
+  }, [nearbyCharacter]);
+
+  // Load collision zones
   useEffect(() => {
     fetch('/data/yuwon-room-layout.json')
       .then(response => response.json())
       .then(data => {
-        // Convert JSON format to simple format for collision detection
         const zones = data.collisionZones.map(zone => ({
           name: zone.name,
           left: parseInt(zone.position.pixel.left),
@@ -96,121 +158,176 @@ function Room() {
       });
   }, []);
 
-  // Outfit management functions
-  const buyOutfit = (character, outfit) => {
-    if (yuCash >= outfit.price && !ownedOutfits[character].includes(outfit.id)) {
-      setOwnedOutfits({
-        ...ownedOutfits,
-        [character]: [...ownedOutfits[character], outfit.id]
-      });
-      setYuCash(yuCash - outfit.price);
-    }
-  };
-
-  const changeOutfit = (character, outfitId) => {
-    setCharacterOutfits({
-      ...characterOutfits,
-      [character]: outfitId
-    });
-    setPlacedCharacters(placedCharacters.map(char =>
-      char.character === character ? { ...char, outfit: outfitId } : char
-    ));
-  };
-
-  const placeCharacter = (character) => {
-    const alreadyPlaced = placedCharacters.some(char => char.character === character);
-    if (alreadyPlaced) {
-      alert(`${character} is already in the room!`);
-      return;
-    }
-    const newChar = {
-      character: character,
-      outfit: characterOutfits[character],
-      x: 270,
-      y: 130,
-      id: `${character}-${Date.now()}`
-    };
-    setPlacedCharacters([...placedCharacters, newChar]);
-  };
-
-  const isCharacterPlaced = (character) => {
-    return placedCharacters.some(char => char.character === character);
-  };
-
-  const getCharacterSprite = (character, outfit) => {
-    if (character === 'yuwon' && outfit === 'yuwon_outfit_1') {
-      return '/images/game-rooms/animation/idle_yuwon_outfit1.gif';
-    }
-    return `/images/game-rooms/char-outfits/${outfit}.png`;
-  };
-
-  const removeCharacter = (id) => {
-    setPlacedCharacters(placedCharacters.filter(c => c.id !== id));
-  };
-
-  // WASD keyboard controls - continuous movement
+  // Keyboard movement with collision detection
   useEffect(() => {
     const keysPressed = {};
     let animationFrameId;
 
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
-      if (['w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         keysPressed[key] = true;
         e.preventDefault();
+      }
+
+      // E key interaction
+      if (key === 'e' && nearbyCharacterRef.current) {
+        if (nearbyCharacterRef.current === 'noah') {
+          const yuwonX = positionRef.current.x;
+          const noahX = noahRef.current.x;
+          const faceDirection = yuwonX > noahX ? 'right' : 'left';
+
+          setNoah(prev => ({
+            ...prev,
+            direction: faceDirection,
+            isWalking: false
+          }));
+        }
+
+        setVNDialogueType(nearbyCharacterRef.current);
+        setDialogueMode('menu');
+        setShowVNDialogue(true);
+        e.preventDefault();
+      }
+
+      // Toggle helpers with H key
+      if (key === 'h') {
+        setShowHelpers(prev => !prev);
+        setShowHitbox(prev => !prev);
+      }
+
+      // Toggle coordinates with C key
+      if (key === 'c') {
+        setShowCoordinates(prev => !prev);
+        e.preventDefault();
+      }
+
+      // Toggle edit mode with E key (when not near character)
+      if (key === 'e' && !nearbyCharacterRef.current) {
+        setEditMode(prev => !prev);
+        setSelectedZone(null);
+        e.preventDefault();
+      }
+
+      // Delete selected zone with Delete key
+      if ((key === 'delete' || e.key === 'Delete') && selectedZone !== null && editMode) {
+        setCollisionZones(prev => prev.filter((_, i) => i !== selectedZone));
+        setSelectedZone(null);
+        e.preventDefault();
+      }
+
+      // Save zones with S key (when in edit mode)
+      if (key === 's' && editMode) {
+        e.preventDefault();
+        saveZonesToFile();
       }
     };
 
     const handleKeyUp = (e) => {
       const key = e.key.toLowerCase();
-      delete keysPressed[key];
+      if (keysPressed[key]) {
+        delete keysPressed[key];
+      }
+    };
+
+    const checkCollision = (newX, newY) => {
+      const hitboxSize = 8;
+      const hitboxOffsetX = 4;
+      const hitboxOffsetY = 18; // Changed from 8 to 18 (10px lower)
+
+      const playerLeft = newX - hitboxSize / 2 + hitboxOffsetX;
+      const playerRight = newX + hitboxSize / 2 + hitboxOffsetX;
+      const playerTop = newY - hitboxSize / 2 + hitboxOffsetY;
+      const playerBottom = newY + hitboxSize / 2 + hitboxOffsetY;
+
+      // Check collision with Noah
+      const currentNoah = noahRef.current;
+      const noahLeft = currentNoah.x - currentNoah.collisionWidth / 2;
+      const noahRight = currentNoah.x + currentNoah.collisionWidth / 2;
+      const noahTop = currentNoah.y - currentNoah.collisionHeight / 2 + 10; // 10px lower
+      const noahBottom = currentNoah.y + currentNoah.collisionHeight / 2 + 10; // 10px lower
+
+      if (playerRight > noahLeft && playerLeft < noahRight &&
+          playerBottom > noahTop && playerTop < noahBottom) {
+        return true;
+      }
+
+      // Check collision with zones
+      for (const zone of collisionZonesRef.current) {
+        if (playerRight > zone.left &&
+            playerLeft < zone.left + zone.width &&
+            playerBottom > zone.top &&
+            playerTop < zone.top + zone.height) {
+          return true;
+        }
+      }
+
+      return false;
     };
 
     const updatePosition = () => {
-      const speed = 1.08; // pixels per frame
-      let newX = positionRef.current.x;
-      let newY = positionRef.current.y;
-      let newDirection = directionRef.current;
-      let moved = false;
+      let dx = 0;
+      let dy = 0;
+      const speed = 1.5;
 
-      if (keysPressed['w'] || keysPressed['arrowup']) {
-        newY -= speed;
-        newDirection = 'up';
-        moved = true;
-      }
-      if (keysPressed['s'] || keysPressed['arrowdown']) {
-        newY += speed;
-        newDirection = 'down';
-        moved = true;
-      }
-      if (keysPressed['a'] || keysPressed['arrowleft']) {
-        newX -= speed;
-        newDirection = 'left';
-        moved = true;
-      }
-      if (keysPressed['d'] || keysPressed['arrowright']) {
-        newX += speed;
-        newDirection = 'right';
-        moved = true;
-      }
+      if (keysPressed['w'] || keysPressed['arrowup']) { dy -= speed; directionRef.current = 'up'; }
+      if (keysPressed['s'] || keysPressed['arrowdown']) { dy += speed; directionRef.current = 'down'; }
+      if (keysPressed['a'] || keysPressed['arrowleft']) { dx -= speed; directionRef.current = 'left'; }
+      if (keysPressed['d'] || keysPressed['arrowright']) { dx += speed; directionRef.current = 'right'; }
 
-      if (moved) {
-        // Keep within room bounds
-        newX = Math.max(30, Math.min(roomWidth - 30, newX));
-        newY = Math.max(30, Math.min(roomHeight - 30, newY));
+      if (dx !== 0 || dy !== 0) {
+        if (dx !== 0 && dy !== 0) {
+          dx *= 0.707;
+          dy *= 0.707;
+        }
 
-        // Check for collision
+        let newX = positionRef.current.x + dx;
+        let newY = positionRef.current.y + dy;
+
+        newX = Math.max(8, Math.min(roomWidth - 8, newX));
+        newY = Math.max(8, Math.min(roomHeight - 8, newY));
+
         if (!checkCollision(newX, newY)) {
           positionRef.current = { x: newX, y: newY };
-          directionRef.current = newDirection;
-          isWalkingRef.current = true;
           setYuwonPosition({ x: newX, y: newY });
-          setDirection(newDirection);
+        }
+
+        if (!isWalkingRef.current) {
+          isWalkingRef.current = true;
           setIsWalking(true);
         }
+        setDirection(directionRef.current);
       } else {
-        isWalkingRef.current = false;
-        setIsWalking(false);
+        if (isWalkingRef.current) {
+          isWalkingRef.current = false;
+          setIsWalking(false);
+        }
+      }
+
+      // Check proximity to Noah (throttled)
+      proximityCheckCounter.current++;
+      if (proximityCheckCounter.current >= 10) {
+        proximityCheckCounter.current = 0;
+
+        const currentNoah = noahRef.current;
+        const distanceToNoah = Math.sqrt(
+          Math.pow(positionRef.current.x - currentNoah.x, 2) +
+          Math.pow(positionRef.current.y - currentNoah.y, 2)
+        );
+
+        const wasNearby = nearbyCharacterRef.current === 'noah';
+        const enterDistance = 45;
+        const exitDistance = 60;
+
+        if (wasNearby) {
+          if (distanceToNoah > exitDistance) {
+            setNearbyCharacter(null);
+          }
+        } else {
+          if (distanceToNoah < enterDistance) {
+            setNearbyCharacter('noah');
+          }
+        }
       }
 
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -225,1221 +342,1035 @@ function Room() {
       window.removeEventListener('keyup', handleKeyUp);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [collisionZones, roomWidth, roomHeight]);
+  }, []);
 
-  // Check if a position collides with any furniture
-  const checkCollision = (x, y) => {
-    const characterSize = 6; // Hitbox radius (reduced by 1px)
-    const spriteHeight = 60;
-    const yOffset = 6; // Center offset (raised by 4px: 10 - 4 = 6)
-    const feetY = y + yOffset + (spriteHeight / 2); // Actual feet position
-
-    for (const zone of collisionZones) {
-      if (
-        x + characterSize > zone.left &&
-        x - characterSize < zone.left + zone.width &&
-        feetY + characterSize > zone.top &&
-        feetY - characterSize < zone.top + zone.height
-      ) {
-        return true; // Collision detected
-      }
+  // Noah's idle pacing AI
+  useEffect(() => {
+    if (showVNDialogue && vnDialogueType === 'noah') {
+      return;
     }
-    return false;
-  };
 
+    let phase = 'paused-left-down'; // Start facing down at left position
+    let pauseTimer = 0;
+    let animationFrameId;
 
-  // Helper mode: Save zones to JSON
-  const saveZonesToJSON = () => {
-    const data = {
-      roomDimensions: { width: roomWidth, height: roomHeight },
-      decorations: [],
+    const updateNoah = () => {
+      setNoah(prev => {
+        let newX = prev.x;
+        let newDirection = prev.direction;
+        let newIsWalking = false;
+
+        // Left position - face down (front)
+        if (phase === 'paused-left-down') {
+          pauseTimer++;
+          newDirection = 'down';
+          newIsWalking = false;
+          if (pauseTimer > 180) { // 3 seconds
+            phase = 'walking-right';
+            pauseTimer = 0;
+          }
+        }
+        // Walking right
+        else if (phase === 'walking-right') {
+          newX += 0.3;
+          newDirection = 'right';
+          newIsWalking = true;
+          if (newX >= 125) {
+            phase = 'paused-right-side';
+            pauseTimer = 0;
+            newX = 125;
+          }
+        }
+        // Right position - look right for 3 seconds
+        else if (phase === 'paused-right-side') {
+          pauseTimer++;
+          newDirection = 'right';
+          newIsWalking = false;
+          if (pauseTimer > 180) { // 3 seconds
+            phase = 'paused-right-up';
+            pauseTimer = 0;
+          }
+        }
+        // Right position - look up for 10 seconds
+        else if (phase === 'paused-right-up') {
+          pauseTimer++;
+          newDirection = 'up';
+          newIsWalking = false;
+          if (pauseTimer > 600) { // 10 seconds
+            phase = 'walking-left';
+            pauseTimer = 0;
+          }
+        }
+        // Walking left
+        else if (phase === 'walking-left') {
+          newX -= 0.3;
+          newDirection = 'left';
+          newIsWalking = true;
+          if (newX <= 54) {
+            phase = 'paused-left-down';
+            pauseTimer = 0;
+            newX = 54;
+          }
+        }
+
+        return {
+          ...prev,
+          x: newX,
+          direction: newDirection,
+          isWalking: newIsWalking
+        };
+      });
+
+      animationFrameId = requestAnimationFrame(updateNoah);
+    };
+
+    animationFrameId = requestAnimationFrame(updateNoah);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [showVNDialogue, vnDialogueType]);
+
+  // Save zones to JSON file
+  const saveZonesToFile = () => {
+    const jsonData = {
       collisionZones: collisionZones.map(zone => ({
         name: zone.name,
         position: {
-          pixel: { left: String(zone.left), top: String(zone.top) },
-          percent: { left: ((zone.left / roomWidth) * 100).toFixed(2), top: ((zone.top / roomHeight) * 100).toFixed(2) }
+          pixel: {
+            left: zone.left.toString(),
+            top: zone.top.toString()
+          }
         },
         size: {
-          pixel: { width: String(zone.width), height: String(zone.height) },
-          percent: { width: ((zone.width / roomWidth) * 100).toFixed(2), height: ((zone.height / roomHeight) * 100).toFixed(2) }
+          pixel: {
+            width: zone.width.toString(),
+            height: zone.height.toString()
+          }
         }
       }))
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+    const dataStr = JSON.stringify(jsonData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'yuwon-room-layout.json';
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'yuwon-room-layout.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    // Visual confirmation
+    console.log('✅ Saved zones to yuwon-room-layout.json');
+    alert('✅ Zones saved to yuwon-room-layout.json!\n\nCheck your Downloads folder.');
   };
 
-  // Helper mode: Zone drag handlers
-  const handleZoneMouseDown = (e, index) => {
-    if (!helperMode) return;
-    e.stopPropagation();
-    setSelectedZone(index);
-    setIsDragging(true);
-    const zone = collisionZones[index];
-    setDragStart({
-      offsetX: e.nativeEvent.offsetX,
-      offsetY: e.nativeEvent.offsetY
-    });
+  // Helper functions for resize handles
+  const getHandlePosition = (handle) => {
+    const positions = {
+      nw: { top: '-4px', left: '-4px' },
+      ne: { top: '-4px', right: '-4px' },
+      sw: { bottom: '-4px', left: '-4px' },
+      se: { bottom: '-4px', right: '-4px' },
+      n: { top: '-4px', left: '0', width: '100%', height: '8px' },
+      s: { bottom: '-4px', left: '0', width: '100%', height: '8px' },
+      e: { right: '-4px', top: '0', width: '8px', height: '100%' },
+      w: { left: '-4px', top: '0', width: '8px', height: '100%' }
+    };
+    return positions[handle];
   };
 
-  const handleResizeMouseDown = (e, index, direction) => {
-    if (!helperMode) return;
-    e.stopPropagation();
-    setSelectedZone(index);
-    setIsResizing(direction);
-    const zone = collisionZones[index];
-    const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
-    setDragStart({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      startLeft: zone.left,
-      startTop: zone.top,
-      startWidth: zone.width,
-      startHeight: zone.height
-    });
+  const getResizeCursor = (handle) => {
+    const cursors = {
+      nw: 'nw-resize',
+      ne: 'ne-resize',
+      sw: 'sw-resize',
+      se: 'se-resize',
+      n: 'n-resize',
+      s: 's-resize',
+      e: 'e-resize',
+      w: 'w-resize'
+    };
+    return cursors[handle];
   };
 
-  const handleZoneMouseMove = (e) => {
-    if (!helperMode || selectedZone === null) return;
+  // Mouse handlers for zone editor
+  const handleRoomMouseDown = (e) => {
+    if (!editMode || isDrawing || isDragging || isResizing) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setIsDrawing(true);
+    setDrawStart({ x, y });
+    setSelectedZone(null);
+  };
+
+  const handleRoomMouseMove = (e) => {
+    if (!editMode) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const updatedZones = [...collisionZones];
 
-    if (isDragging) {
-      const newLeft = mouseX - dragStart.offsetX;
-      const newTop = mouseY - dragStart.offsetY;
-      updatedZones[selectedZone] = {
-        ...updatedZones[selectedZone],
-        left: Math.round(Math.max(0, Math.min(roomWidth - updatedZones[selectedZone].width, newLeft))),
-        top: Math.round(Math.max(0, Math.min(roomHeight - updatedZones[selectedZone].height, newTop)))
-      };
-      setCollisionZones(updatedZones);
-    } else if (isResizing) {
-      const zone = updatedZones[selectedZone];
-      const dx = mouseX - dragStart.x;
-      const dy = mouseY - dragStart.y;
+    // Update current mouse position for drawing preview
+    setCurrentMouse({ x: mouseX, y: mouseY });
 
-      if (isResizing === 'se') {
-        zone.width = Math.max(10, dragStart.startWidth + dx);
-        zone.height = Math.max(10, dragStart.startHeight + dy);
-      } else if (isResizing === 'sw') {
-        const newWidth = Math.max(10, dragStart.startWidth - dx);
-        zone.left = dragStart.startLeft + (dragStart.startWidth - newWidth);
-        zone.width = newWidth;
-        zone.height = Math.max(10, dragStart.startHeight + dy);
-      } else if (isResizing === 'ne') {
-        zone.width = Math.max(10, dragStart.startWidth + dx);
-        const newHeight = Math.max(10, dragStart.startHeight - dy);
-        zone.top = dragStart.startTop + (dragStart.startHeight - newHeight);
-        zone.height = newHeight;
-      } else if (isResizing === 'nw') {
-        const newWidth = Math.max(10, dragStart.startWidth - dx);
-        const newHeight = Math.max(10, dragStart.startHeight - dy);
-        zone.left = dragStart.startLeft + (dragStart.startWidth - newWidth);
-        zone.top = dragStart.startTop + (dragStart.startHeight - newHeight);
-        zone.width = newWidth;
-        zone.height = newHeight;
-      }
-      setCollisionZones(updatedZones);
+    // Handle drawing new zone
+    if (isDrawing && drawStart) {
+      // Preview is rendered below
     }
-  };
 
-  const handleZoneMouseUp = () => {
-    setIsDragging(false);
-    setIsResizing(false);
-  };
+    // Handle dragging zone
+    if (isDragging && selectedZone !== null) {
+      const newLeft = mouseX - dragOffset.x;
+      const newTop = mouseY - dragOffset.y;
 
-  const handleNameChange = (index, newName) => {
-    const updatedZones = [...collisionZones];
-    updatedZones[index].name = newName;
-    setCollisionZones(updatedZones);
-  };
+      setCollisionZones(prev => {
+        const updated = [...prev];
+        updated[selectedZone] = {
+          ...updated[selectedZone],
+          left: Math.max(0, Math.min(roomWidth - updated[selectedZone].width, newLeft)),
+          top: Math.max(0, Math.min(roomHeight - updated[selectedZone].height, newTop))
+        };
+        return updated;
+      });
+    }
 
-  // Draw new zone handlers
-  const handleRoomMouseDown = (e) => {
-    if (!helperMode || !isDrawingNew) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setNewZoneStart({ x, y });
-  };
+    // Handle resizing zone
+    if (isResizing && selectedZone !== null && resizeHandle) {
+      setCollisionZones(prev => {
+        const updated = [...prev];
+        const zone = updated[selectedZone];
+        const newZone = { ...zone };
 
-  const handleRoomMouseMove = (e) => {
-    if (!helperMode || !isDrawingNew || !newZoneStart) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    setCurrentMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        if (resizeHandle.includes('e')) {
+          newZone.width = Math.max(10, mouseX - zone.left);
+        }
+        if (resizeHandle.includes('w')) {
+          const newWidth = zone.width + (zone.left - mouseX);
+          if (newWidth >= 10) {
+            newZone.left = mouseX;
+            newZone.width = newWidth;
+          }
+        }
+        if (resizeHandle.includes('s')) {
+          newZone.height = Math.max(10, mouseY - zone.top);
+        }
+        if (resizeHandle.includes('n')) {
+          const newHeight = zone.height + (zone.top - mouseY);
+          if (newHeight >= 10) {
+            newZone.top = mouseY;
+            newZone.height = newHeight;
+          }
+        }
+
+        updated[selectedZone] = newZone;
+        return updated;
+      });
+    }
   };
 
   const handleRoomMouseUp = (e) => {
-    if (!helperMode || !isDrawingNew || !newZoneStart) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (isDrawing && drawStart) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
 
-    const left = Math.min(newZoneStart.x, x);
-    const top = Math.min(newZoneStart.y, y);
-    const width = Math.abs(x - newZoneStart.x);
-    const height = Math.abs(y - newZoneStart.y);
+      const left = Math.min(drawStart.x, endX);
+      const top = Math.min(drawStart.y, endY);
+      const width = Math.abs(endX - drawStart.x);
+      const height = Math.abs(endY - drawStart.y);
 
-    if (width > 5 && height > 5) {
-      const newZone = {
-        name: `Zone ${collisionZones.length + 1}`,
-        left: Math.round(left),
-        top: Math.round(top),
-        width: Math.round(width),
-        height: Math.round(height)
-      };
-      setCollisionZones([...collisionZones, newZone]);
+      if (width > 5 && height > 5) {
+        const newZone = {
+          name: `Zone ${collisionZones.length}`,
+          left: Math.round(left),
+          top: Math.round(top),
+          width: Math.round(width),
+          height: Math.round(height)
+        };
+        setCollisionZones(prev => [...prev, newZone]);
+        setSelectedZone(collisionZones.length);
+      }
     }
-    setNewZoneStart(null);
-    setCurrentMousePos(null);
-    setIsDrawingNew(false);
+
+    setIsDrawing(false);
+    setDrawStart(null);
+    setIsDragging(false);
+    setIsResizing(false);
+    setResizeHandle(null);
   };
 
   return (
     <div>
       <div className="current-date">
-        🏠 Yuwon's Room
+        🏠 MY ROOM
       </div>
 
-      <div className="content">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', padding: '20px 20px 120px 20px' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <p style={{ color: '#666', fontSize: '13px', margin: 0, textAlign: 'center' }}>
-            Use <strong>WASD/Arrow Keys</strong> to walk around • <strong>Click</strong> objects to interact
-          </p>
-          <button
-            onClick={() => setHelperMode(!helperMode)}
-            style={{
-              background: helperMode ? '#f44336' : '#2196f3',
-              color: 'white',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            {helperMode ? '✓ Helper ON' : '🛠️ Edit Zones'}
-          </button>
-          {helperMode && (
-            <>
-              <button
-                onClick={() => setIsDrawingNew(!isDrawingNew)}
-                style={{
-                  background: isDrawingNew ? '#ff9800' : '#9c27b0',
-                  color: 'white',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                {isDrawingNew ? '✓ Drawing...' : '➕ Draw New'}
-              </button>
-              <button
-                onClick={() => setShowCoordinates(!showCoordinates)}
-                style={{
-                  background: showCoordinates ? '#607d8b' : '#757575',
-                  color: 'white',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                {showCoordinates ? '📍 Hide Coords' : '📍 Show Coords'}
-              </button>
-              <button
-                onClick={saveZonesToJSON}
-                style={{
-                  background: '#4caf50',
-                  color: 'white',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                💾 Save JSON
-              </button>
-            </>
-          )}
-          <button
-            onClick={() => setShowHitbox(!showHitbox)}
-            style={{
-              background: showHitbox ? '#00bcd4' : '#009688',
-              color: 'white',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            {showHitbox ? '👤 Hide Hitbox' : '👤 Show Hitbox'}
-          </button>
-        </div>
-        {/* Room */}
+      {/* Main container */}
+      <div style={{
+        maxWidth: '1200px',
+        margin: '20px auto',
+        padding: '0 20px'
+      }}>
+        {/* Room container */}
         <div
           onMouseDown={handleRoomMouseDown}
-          onMouseMove={isDrawingNew ? handleRoomMouseMove : handleZoneMouseMove}
-          onMouseUp={isDrawingNew ? handleRoomMouseUp : handleZoneMouseUp}
+          onMouseMove={handleRoomMouseMove}
+          onMouseUp={handleRoomMouseUp}
+          onMouseLeave={handleRoomMouseUp}
           style={{
             width: `${roomWidth}px`,
             height: `${roomHeight}px`,
-            background: '#f5f5f5',
-            border: '3px solid #e91e63',
-            borderRadius: '12px',
+            margin: '0 auto',
             position: 'relative',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
+            backgroundColor: '#000',
+            imageRendering: 'pixelated',
+            border: editMode ? '4px solid #ff9800' : '4px solid #e91e63',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: editMode ? '0 8px 32px rgba(255, 152, 0, 0.5)' : '0 8px 32px rgba(233, 30, 99, 0.3)',
+            cursor: editMode ? 'crosshair' : 'default'
           }}
         >
-          {/* Room Background */}
+          {/* Room background */}
           <img
             src="/images/game-rooms/room_bg.png"
-            alt="Room background"
+            alt="Room Background"
             style={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              width: `${roomWidth}px`,
-              height: `${roomHeight}px`,
-              objectFit: 'fill',
+              top: '2px',
+              left: '2px',
+              width: 'calc(100% - 4px)',
+              height: 'calc(100% - 4px)',
               imageRendering: 'pixelated',
               pointerEvents: 'none',
               zIndex: 1
             }}
           />
 
-          {/* Rugs/Carpets */}
-          <img
-            src="/images/game-rooms/Carpet_1.png"
-            alt="Carpet 1"
-            style={{
-              position: 'absolute',
-              left: '63px',
-              top: '134px',
-              width: 'auto',
-              height: 'auto',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 2
-            }}
-          />
-          <img
-            src="/images/game-rooms/Carpet_2.png"
-            alt="Carpet 2"
-            style={{
-              position: 'absolute',
-              left: '19px',
-              top: '278px',
-              width: 'auto',
-              height: 'auto',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 2
-            }}
-          />
-          <img
-            src="/images/game-rooms/Carpet_3.png"
-            alt="Carpet 3"
-            style={{
-              position: 'absolute',
-              left: '327px',
-              top: '172px',
-              width: 'auto',
-              height: 'auto',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 2
-            }}
-          />
-          <img
-            src="/images/game-rooms/Carpet_4.png"
-            alt="Carpet 4"
-            style={{
-              position: 'absolute',
-              left: '508px',
-              top: '132px',
-              width: 'auto',
-              height: 'auto',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 2
-            }}
-          />
-
-          {/* Placed Characters */}
-          {placedCharacters.map((char) => (
-            <img
-              key={char.id}
-              src={getCharacterSprite(char.character, char.outfit)}
-              alt={char.character}
-              style={{
-                position: 'absolute',
-                left: `${char.x}px`,
-                top: `${char.y}px`,
-                transform: 'translate(-50%, -50%) scale(1.5)',
-                width: 'auto',
-                height: '60px',
-                objectFit: 'contain',
-                imageRendering: 'pixelated',
-                pointerEvents: 'none',
-                zIndex: 14
-              }}
-            />
-          ))}
-
-          {/* Noah - Animated Character */}
-          <div
-            onMouseEnter={() => setHoveredInteractable('noah')}
-            onMouseLeave={() => setHoveredInteractable(null)}
-            onClick={() => {
-              setVNDialogueType('noah');
-              setShowVNDialogue(true);
-            }}
-            style={{
-              position: 'absolute',
-              left: '80px',
-              top: '69px',
-              width: '90px',
-              height: '90px',
-              cursor: 'pointer',
-              zIndex: 14,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <SpriteAnimation
-              spriteSheet="/images/Idle-noah/Noah_Idle_Left_Outfit 1.png"
-              rows={1}
-              columns={8}
-              frameDelay={100}
-              selectedFrames={[0, 1, 2, 3, 4, 5, 6, 7]}
-              scale={1.4}
-              style={{
-                pointerEvents: 'none'
-              }}
-            />
-          </div>
-
-          {/* Yuwon */}
-          <img
-            key={`${direction}-${isWalking}`}
-            src={
-              isWalking
-                ? direction === 'down'
-                  ? "/images/yuwon_walk_front.gif"
-                  : direction === 'up'
-                  ? "/images/yuwon_walk_back.gif"
-                  : "/images/yuwon_walk_side.gif"
-                : "/images/idle_yuwon_outfit1.gif"
-            }
-            alt="Yuwon"
-            style={{
-              position: 'absolute',
-              left: `${yuwonPosition.x}px`,
-              top: `${yuwonPosition.y + 10}px`,
-              transform: `translate(-50%, -50%) ${direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)'} ${(direction === 'down' || direction === 'up') && isWalking ? 'scale(1.20)' : 'scale(1.05)'}`,
-              width: 'auto',
-              height: '60px',
-              objectFit: 'contain',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 15,
-              filter: 'none'
-            }}
-          />
-
-          {/* Furniture Layer */}
+          {/* Furniture overlay */}
           <img
             src="/images/game-rooms/Furnitures.png"
             alt="Furniture"
             style={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              width: `${roomWidth}px`,
-              height: `${roomHeight}px`,
-              objectFit: 'fill',
+              top: '2px',
+              left: '2px',
+              width: 'calc(100% - 4px)',
+              height: 'calc(100% - 4px)',
               imageRendering: 'pixelated',
               pointerEvents: 'none',
-              zIndex: 10
+              zIndex: 500
             }}
           />
 
-          {/* Clickable Stove Zone */}
-          <div
-            onMouseEnter={() => setHoveredInteractable('stove')}
-            onMouseLeave={() => setHoveredInteractable(null)}
-            onClick={() => {
-              setVNDialogueType('stove');
-              setShowVNDialogue(true);
-            }}
-            style={{
-              position: 'absolute',
-              left: `${interactionZones.stove.left}px`,
-              top: `${interactionZones.stove.top}px`,
-              width: `${interactionZones.stove.width}px`,
-              height: `${interactionZones.stove.height}px`,
-              cursor: 'pointer',
-              zIndex: 11
-            }}
-          />
-
-          {/* Clickable Fridge Zone */}
-          <div
-            onMouseEnter={() => setHoveredInteractable('fridge')}
-            onMouseLeave={() => setHoveredInteractable(null)}
-            onClick={() => {
-              setVNDialogueType('fridge');
-              setShowVNDialogue(true);
-            }}
-            style={{
-              position: 'absolute',
-              left: `${interactionZones.fridge.left}px`,
-              top: `${interactionZones.fridge.top}px`,
-              width: `${interactionZones.fridge.width}px`,
-              height: `${interactionZones.fridge.height}px`,
-              cursor: 'pointer',
-              zIndex: 11
-            }}
-          />
-
-          {/* Kitchen Island Overlay - cropped to show only top 20px */}
-          <img
-            src="/images/game-rooms/Kitchen Island_Decorated.png"
-            alt="Kitchen Island"
-            style={{
-              position: 'absolute',
-              left: '253px',
-              top: '147px',
-              width: 'auto',
-              height: 'auto',
-              transform: 'scaleX(1.05) scaleY(1.04)',
-              transformOrigin: 'top left',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 20,
-              clipPath: 'inset(0 0 calc(100% - 20px) 0)'
-            }}
-          />
-
-          {/* Sofa Overlay - cropped to show only top 20px, cut 10px from left */}
-          <img
-            src="/images/game-rooms/Sofa.png"
-            alt="Sofa"
-            style={{
-              position: 'absolute',
-              left: '152px',
-              top: '131px',
-              width: 'auto',
-              height: 'auto',
-              transform: 'scaleX(1.04) scaleY(1.03)',
-              transformOrigin: 'top left',
-              imageRendering: 'pixelated',
-              pointerEvents: 'none',
-              zIndex: 20,
-              clipPath: 'inset(0 0 calc(100% - 20px) 10px)'
-            }}
-          />
-
-          {/* Collision Zones - Helper Mode */}
-          {helperMode && collisionZones.map((zone, index) => (
+          {/* Collision zones visualization/editing */}
+          {(showHelpers || showCoordinates) && collisionZones.map((zone, index) => (
             <div
               key={index}
+              onClick={(e) => {
+                if (editMode) {
+                  e.stopPropagation();
+                  setSelectedZone(index);
+                }
+              }}
+              onMouseDown={(e) => {
+                if (editMode && !isResizing) {
+                  e.stopPropagation();
+                  setSelectedZone(index);
+                  setIsDragging(true);
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const parentRect = e.currentTarget.parentElement.getBoundingClientRect();
+                  setDragOffset({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                  });
+                }
+              }}
               style={{
                 position: 'absolute',
                 left: `${zone.left}px`,
                 top: `${zone.top}px`,
                 width: `${zone.width}px`,
                 height: `${zone.height}px`,
-                border: selectedZone === index ? '3px solid #2196f3' : '2px dashed rgba(255, 152, 0, 0.8)',
-                background: selectedZone === index ? 'rgba(33, 150, 243, 0.3)' : 'rgba(255, 152, 0, 0.2)',
-                zIndex: 25
+                border: selectedZone === index ? '3px solid rgba(255, 0, 0, 0.9)' : showHelpers ? '2px solid rgba(255, 0, 0, 0.5)' : '2px solid rgba(255, 0, 0, 0.3)',
+                background: selectedZone === index ? 'rgba(255, 0, 0, 0.25)' : showHelpers ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 0, 0, 0.05)',
+                pointerEvents: editMode ? 'auto' : 'none',
+                cursor: editMode ? 'move' : 'default',
+                zIndex: selectedZone === index ? 10000 : 9999,
+                fontSize: '10px',
+                color: 'red',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              {/* Draggable area */}
-              <div
-                onMouseDown={(e) => handleZoneMouseDown(e, index)}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  cursor: 'move'
-                }}
-              />
+              {zone.name || index}
+
+              {/* Zone coordinates */}
+              {showCoordinates && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-22px',
+                  left: '0',
+                  fontSize: '9px',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  background: 'rgba(0, 0, 0, 0.8)',
+                  padding: '2px 4px',
+                  borderRadius: '3px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  L:{zone.left} T:{zone.top} W:{zone.width} H:{zone.height}
+                </div>
+              )}
 
               {/* Delete button */}
-              {selectedZone === index && (
+              {editMode && selectedZone === index && (
                 <button
-                  onClick={() => {
-                    const updatedZones = collisionZones.filter((_, i) => i !== index);
-                    setCollisionZones(updatedZones);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCollisionZones(prev => prev.filter((_, i) => i !== selectedZone));
                     setSelectedZone(null);
                   }}
                   style={{
                     position: 'absolute',
-                    top: '-28px',
-                    right: 0,
-                    background: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
+                    top: '-30px',
+                    right: '-30px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '2px solid red',
+                    background: 'white',
+                    color: 'red',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10002
                   }}
                 >
-                  🗑️ Delete
+                  ×
                 </button>
               )}
 
-              {/* Editable name label */}
-              <div style={{
-                position: 'absolute',
-                top: '-22px',
-                left: 0,
-                whiteSpace: 'nowrap'
-              }}>
-                {editingName === index ? (
-                  <input
-                    type="text"
-                    value={zone.name}
-                    onChange={(e) => handleNameChange(index, e.target.value)}
-                    onBlur={() => setEditingName(null)}
-                    onKeyPress={(e) => e.key === 'Enter' && setEditingName(null)}
-                    autoFocus
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      border: '1px solid #2196f3',
-                      fontWeight: '600'
-                    }}
-                  />
-                ) : (
-                  <div
-                    onDoubleClick={() => setEditingName(index)}
-                    style={{
-                      fontSize: '11px',
-                      color: '#ff9800',
-                      background: 'white',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontWeight: '600',
-                      cursor: 'text'
-                    }}
-                  >
-                    {zone.name}{showCoordinates ? ` (${zone.left}, ${zone.top}, ${zone.width}×${zone.height})` : ''}
-                  </div>
-                )}
-              </div>
-
               {/* Resize handles */}
-              {selectedZone === index && (
+              {editMode && selectedZone === index && (
                 <>
-                  <div onMouseDown={(e) => handleResizeMouseDown(e, index, 'nw')} style={{ position: 'absolute', top: -4, left: -4, width: 8, height: 8, background: '#2196f3', cursor: 'nw-resize', borderRadius: '50%' }} />
-                  <div onMouseDown={(e) => handleResizeMouseDown(e, index, 'ne')} style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, background: '#2196f3', cursor: 'ne-resize', borderRadius: '50%' }} />
-                  <div onMouseDown={(e) => handleResizeMouseDown(e, index, 'sw')} style={{ position: 'absolute', bottom: -4, left: -4, width: 8, height: 8, background: '#2196f3', cursor: 'sw-resize', borderRadius: '50%' }} />
-                  <div onMouseDown={(e) => handleResizeMouseDown(e, index, 'se')} style={{ position: 'absolute', bottom: -4, right: -4, width: 8, height: 8, background: '#2196f3', cursor: 'se-resize', borderRadius: '50%' }} />
+                  {['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].map(handle => (
+                    <div
+                      key={handle}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setIsResizing(true);
+                        setResizeHandle(handle);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        width: handle.length === 1 ? '100%' : '8px',
+                        height: handle.length === 1 ? '100%' : '8px',
+                        background: 'white',
+                        border: '2px solid red',
+                        ...getHandlePosition(handle),
+                        cursor: getResizeCursor(handle),
+                        zIndex: 10001
+                      }}
+                    />
+                  ))}
                 </>
               )}
             </div>
           ))}
 
-          {/* Drawing new zone preview */}
-          {helperMode && isDrawingNew && newZoneStart && currentMousePos && (
+          {/* Interaction zones visualization */}
+          {showHelpers && Object.entries(interactionZones).map(([name, zone]) => (
+            <div
+              key={name}
+              style={{
+                position: 'absolute',
+                left: `${zone.left}px`,
+                top: `${zone.top}px`,
+                width: `${zone.width}px`,
+                height: `${zone.height}px`,
+                border: '2px solid rgba(0, 255, 0, 0.7)',
+                background: 'rgba(0, 255, 0, 0.15)',
+                pointerEvents: 'none',
+                zIndex: 9999,
+                fontSize: '10px',
+                color: 'lime',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {name}
+            </div>
+          ))}
+
+          {/* Yuwon hitbox visualization */}
+          {showHitbox && (
             <div
               style={{
                 position: 'absolute',
-                left: `${Math.min(newZoneStart.x, currentMousePos.x)}px`,
-                top: `${Math.min(newZoneStart.y, currentMousePos.y)}px`,
-                width: `${Math.abs(currentMousePos.x - newZoneStart.x)}px`,
-                height: `${Math.abs(currentMousePos.y - newZoneStart.y)}px`,
-                border: '2px dashed #9c27b0',
-                background: 'rgba(156, 39, 176, 0.2)',
+                left: `${yuwonPosition.x - 4 + 4}px`,
+                top: `${yuwonPosition.y - 4 + 18}px`,
+                width: '8px',
+                height: '8px',
+                border: '2px solid rgba(0, 150, 255, 0.8)',
+                background: 'rgba(0, 150, 255, 0.2)',
                 pointerEvents: 'none',
-                zIndex: 30
+                zIndex: 10000
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                left: '12px',
+                fontSize: '10px',
+                color: 'cyan',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                background: 'rgba(0, 0, 0, 0.7)',
+                padding: '2px 4px',
+                borderRadius: '4px'
+              }}>
+                ({Math.round(yuwonPosition.x)}, {Math.round(yuwonPosition.y)})
+              </div>
+            </div>
+          )}
+
+          {/* Noah hitbox visualization */}
+          {showHitbox && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${noah.x - noah.collisionWidth / 2}px`,
+                top: `${noah.y - noah.collisionHeight / 2 + 10}px`,
+                width: `${noah.collisionWidth}px`,
+                height: `${noah.collisionHeight}px`,
+                border: '2px solid rgba(255, 150, 0, 0.8)',
+                background: 'rgba(255, 150, 0, 0.2)',
+                pointerEvents: 'none',
+                zIndex: 10000
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                left: '16px',
+                fontSize: '10px',
+                color: 'orange',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                background: 'rgba(0, 0, 0, 0.7)',
+                padding: '2px 4px',
+                borderRadius: '4px'
+              }}>
+                ({Math.round(noah.x)}, {Math.round(noah.y)})
+              </div>
+            </div>
+          )}
+
+          {/* Drawing preview */}
+          {isDrawing && drawStart && currentMouse && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${Math.min(drawStart.x, currentMouse.x)}px`,
+                top: `${Math.min(drawStart.y, currentMouse.y)}px`,
+                width: `${Math.abs(currentMouse.x - drawStart.x)}px`,
+                height: `${Math.abs(currentMouse.y - drawStart.y)}px`,
+                border: '2px dashed yellow',
+                background: 'rgba(255, 255, 0, 0.2)',
+                pointerEvents: 'none',
+                zIndex: 10002
               }}
             />
           )}
 
-          {/* Yuwon's Hitbox Visualizer */}
-          {showHitbox && (
-            <>
-              {/* Hitbox circle */}
-              <div
-                style={{
-                  position: 'absolute',
-                  left: `${yuwonPosition.x}px`,
-                  top: `${yuwonPosition.y + 6 + 30}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '12px',
-                  height: '12px',
-                  border: '2px solid #4caf50',
-                  borderRadius: '50%',
-                  background: 'rgba(76, 175, 80, 0.3)',
-                  zIndex: 25,
-                  pointerEvents: 'none'
-                }}
-              />
-              {/* Center dot */}
-              <div
-                style={{
-                  position: 'absolute',
-                  left: `${yuwonPosition.x}px`,
-                  top: `${yuwonPosition.y + 6 + 30}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '4px',
-                  height: '4px',
-                  background: '#4caf50',
-                  borderRadius: '50%',
-                  zIndex: 26,
-                  pointerEvents: 'none'
-                }}
-              />
-            </>
-          )}
-
-          {/* Hover indicator on interactable zones */}
-          {hoveredInteractable === 'stove' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${interactionZones.stove.left + interactionZones.stove.width / 2}px`,
-                top: `${interactionZones.stove.top - 10}px`,
-                transform: 'translate(-50%, -100%)',
-                background: 'rgba(255, 255, 255, 0.95)',
-                color: '#e91e63',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '600',
-                zIndex: 20,
-                pointerEvents: 'none',
-                border: '2px solid #e91e63',
-                boxShadow: '0 2px 8px rgba(233, 30, 99, 0.3)',
-                animation: 'fadeIn 0.2s ease-in-out, bounce 0.6s ease-in-out infinite',
-                opacity: 0.9
-              }}
-            >
-              🍳 Stove
-            </div>
-          )}
-          {hoveredInteractable === 'fridge' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${interactionZones.fridge.left + interactionZones.fridge.width / 2}px`,
-                top: `${interactionZones.fridge.top - 10}px`,
-                transform: 'translate(-50%, -100%)',
-                background: 'rgba(255, 255, 255, 0.95)',
-                color: '#2196f3',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '600',
-                zIndex: 20,
-                pointerEvents: 'none',
-                border: '2px solid #2196f3',
-                boxShadow: '0 2px 8px rgba(33, 150, 243, 0.3)',
-                animation: 'fadeIn 0.2s ease-in-out, bounce 0.6s ease-in-out infinite',
-                opacity: 0.9
-              }}
-            >
-              🧊 Fridge
-            </div>
-          )}
-          {hoveredInteractable === 'noah' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: '130px',
-                top: '84px',
-                transform: 'translate(-50%, -100%)',
-                background: 'rgba(255, 255, 255, 0.95)',
-                color: '#673ab7',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '600',
-                zIndex: 20,
-                pointerEvents: 'none',
-                border: '2px solid #673ab7',
-                boxShadow: '0 2px 8px rgba(103, 58, 183, 0.3)',
-                animation: 'fadeIn 0.2s ease-in-out, bounce 0.6s ease-in-out infinite',
-                opacity: 0.9
-              }}
-            >
-              💼 Noah
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* VN-Style Dialogue Box */}
-      {showVNDialogue && (
-        <>
-          {/* Backdrop to close on click */}
-          <div
-            onClick={() => setShowVNDialogue(false)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 999
-            }}
-          />
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed',
-              bottom: '90px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '85%',
-              maxWidth: '550px',
-              background: 'linear-gradient(135deg, #fff9f0 0%, #ffe6f5 100%)',
-              border: '3px solid #ffc1e3',
-              borderRadius: '16px',
-              padding: '0',
-              paddingRight: '12px',
-              zIndex: 1000,
-              boxShadow: '0 4px 12px rgba(233, 30, 99, 0.15)',
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'stretch'
-            }}
-          >
-          {/* Character Portrait */}
-          <img
-            src={
-              vnDialogueType === 'noah'
-                ? "/images/avatar_noah.jpg"
-                : vnDialogueType === 'stove'
-                ? "/images/vn_sprites_head/portrait_yuwon_smile.png"
-                : "/images/vn_sprites_head/portrait_yuwon_normal.png"
-            }
-            alt={vnDialogueType === 'noah' ? 'Noah' : 'Yuwon'}
-            style={{
-              width: '140px',
-              height: '140px',
-              borderRadius: '13px 0 0 13px',
-              objectFit: 'cover',
-              flexShrink: 0
-            }}
-          />
-
-          {/* Dialogue Content */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 0' }}>
-            <div style={{
-              color: vnDialogueType === 'noah' ? '#673ab7' : '#e91e63',
-              fontSize: '11px',
-              fontWeight: '600',
-              marginBottom: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              {vnDialogueType === 'noah' ? '💼 Noah' : '💕 Yuwon'}
-            </div>
-            <div style={{
-              color: '#666',
-              fontSize: '13px',
-              lineHeight: '1.5',
-              marginBottom: '10px',
-              fontWeight: '500',
-              background: 'rgba(255, 255, 255, 0.6)',
-              padding: '10px 12px',
-              borderRadius: '8px',
-              border: vnDialogueType === 'noah' ? '2px solid rgba(103, 58, 183, 0.2)' : '2px solid rgba(233, 30, 99, 0.2)',
-              flex: 1
-            }}>
-              {vnDialogueType === 'noah'
-                ? "Your room is... quaint. Is that... plushies?"
-                : vnDialogueType === 'stove'
-                ? "I'm feeling like cooking! ✨"
-                : "Let me see what's inside~ 🌸"}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {vnDialogueType !== 'noah' && (
+          {/* Helper toggle hint */}
+          <div style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: editMode ? 'rgba(255, 152, 0, 0.9)' : 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontWeight: '600',
+            zIndex: 10001,
+            pointerEvents: editMode ? 'auto' : 'none',
+            textAlign: 'right'
+          }}>
+            {editMode ? (
+              <>
+                <div>🔧 EDIT MODE</div>
+                <div style={{ fontSize: '9px', marginTop: '4px' }}>
+                  Draw: Click & drag | Move: Drag zone | Resize: Drag handles | Delete: × button
+                </div>
                 <button
-                  onClick={() => {
-                    setShowVNDialogue(false);
-                    if (vnDialogueType === 'stove') {
-                      setShowCookingGame(true);
-                    } else {
-                      setShowFridge(true);
-                    }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    saveZonesToFile();
                   }}
-                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                   style={{
-                    background: 'linear-gradient(135deg, #ff6b9d 0%, #e91e63 100%)',
+                    marginTop: '8px',
+                    background: '#4caf50',
                     color: 'white',
                     border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: '600',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '700',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(233, 30, 99, 0.3)',
-                    transition: 'transform 0.2s'
+                    width: '100%'
                   }}
                 >
-                  {vnDialogueType === 'stove' ? '🍳 Cook' : '🧊 Fridge'}
+                  💾 Save Zones
                 </button>
-              )}
-              <button
-                onClick={() => setShowVNDialogue(false)}
-                onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                style={{
-                  background: 'linear-gradient(135deg, #d4a5ff 0%, #b18cdb 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(180, 140, 219, 0.3)',
-                  transition: 'transform 0.2s'
-                }}
-              >
-                Later~
-              </button>
-            </div>
-          </div>
-        </div>
-        </>
-      )}
-
-      {/* Cooking Game Popup */}
-      {showCookingGame && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowCookingGame(false)}
-        >
-          <div
-            style={{
-              background: 'white',
-              padding: '30px',
-              borderRadius: '16px',
-              maxWidth: '500px',
-              width: '90%'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ color: '#e91e63', marginTop: 0 }}>🍳 Cooking - Apple Pie</h2>
-            <p style={{ color: '#666', marginBottom: '20px' }}>
-              Let's make an apple pie! You need:
-            </p>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ marginBottom: '10px' }}>🥛 Milk: {ingredients.milk} {ingredients.milk > 0 ? '✓' : '✗'}</div>
-              <div style={{ marginBottom: '10px' }}>🌾 Flour: {ingredients.flour} {ingredients.flour > 0 ? '✓' : '✗'}</div>
-              <div style={{ marginBottom: '10px' }}>🍎 Apple: {ingredients.apple} {ingredients.apple > 0 ? '✓' : '✗'}</div>
-            </div>
-            {ingredients.milk > 0 && ingredients.flour > 0 && ingredients.apple > 0 ? (
-              <button
-                onClick={() => {
-                  setIngredients({ milk: ingredients.milk - 1, flour: ingredients.flour - 1, apple: ingredients.apple - 1 });
-                  alert('🥧 Apple Pie crafted!');
-                  setShowCookingGame(false);
-                }}
-                style={{
-                  width: '100%',
-                  background: '#4caf50',
-                  color: 'white',
-                  border: 'none',
-                  padding: '15px',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                🥧 Cook Apple Pie
-              </button>
+              </>
             ) : (
-              <div style={{ padding: '15px', background: '#ffebee', borderRadius: '8px', color: '#c62828', textAlign: 'center' }}>
-                ❌ Not enough ingredients! Check the fridge.
+              <>
+                <div>Press H for helpers</div>
+                <div style={{ fontSize: '9px', marginTop: '4px' }}>Press E for edit mode | Press C for coordinates</div>
+              </>
+            )}
+          </div>
+
+          {/* Noah sprite */}
+          <div style={{
+            position: 'absolute',
+            left: `${noah.x}px`,
+            top: `${noah.y}px`,
+            transform: 'translate(-50%, -50%)',
+            imageRendering: 'pixelated',
+            pointerEvents: 'none',
+            zIndex: noah.y
+          }}>
+            <img
+              src={noah.direction === 'up'
+                ? '/images/walking-sprites/Noah/Walking/walkback_noah.gif'
+                : noah.direction === 'down'
+                ? '/images/walking-sprites/Noah/Walking/walkfront_noah.gif'
+                : '/images/walking-sprites/Noah/Walking/walkside_noah.gif'}
+              alt="Noah"
+              style={{
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: noah.isWalking ? 'block' : 'none',
+                transform: noah.direction === 'left' ? 'scaleX(-1)' : 'none'
+              }}
+            />
+            <img
+              src={noah.direction === 'up'
+                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Back_Outfit1animation.gif'
+                : noah.direction === 'down'
+                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Front_Outfit1animation.gif'
+                : '/images/walking-sprites/Noah/Idle/Noah_Idle_Left_Outfit1animation.gif'}
+              alt="Noah idle"
+              style={{
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: noah.isWalking ? 'none' : 'block',
+                transform: noah.direction === 'left' ? 'scaleX(-1)' : 'none'
+              }}
+            />
+          </div>
+
+          {/* Yuwon sprite with item on head */}
+          <div style={{
+            position: 'absolute',
+            left: `${yuwonPosition.x}px`,
+            top: `${yuwonPosition.y}px`,
+            transform: 'translate(-50%, -50%)',
+            imageRendering: 'pixelated',
+            pointerEvents: 'none',
+            zIndex: (() => {
+              const x = yuwonPosition.x;
+              const y = yuwonPosition.y;
+
+              // Check if Yuwon is in furniture overlap zones (behind furniture)
+              // Kitchen area: 148,131,174,49
+              if (x >= 148 && x <= 148 + 174 && y >= 131 && y <= 131 + 49) {
+                return 450; // Behind furniture
+              }
+
+              // Sofa area: 72,143,69,26
+              if (x >= 72 && x <= 72 + 69 && y >= 143 && y <= 143 + 26) {
+                return 450; // Behind furniture
+              }
+
+              // Base z-index: use Y position for depth sorting
+              // If Yuwon is above Noah (smaller Y), use lower z-index than Noah
+              // If Yuwon is below Noah (larger Y), use higher z-index than Noah
+              const baseZ = Math.max(501, y);
+
+              // Adjust relative to Noah for proper layering
+              if (y < noah.y) {
+                // Yuwon is above Noah, should be behind Noah
+                return Math.min(baseZ, noah.y - 1);
+              } else {
+                // Yuwon is below Noah, should be in front of Noah
+                return Math.max(baseZ, noah.y + 1);
+              }
+            })()
+          }}>
+            {/* Held item on head */}
+            {heldItem && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '-12px',
+                transform: 'translateX(-50%)',
+                width: '16px',
+                height: '16px',
+                animation: 'bounceItem 1s ease-in-out infinite',
+                zIndex: 1000
+              }}>
+                <img
+                  src={heldItem.image}
+                  alt={heldItem.name}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    imageRendering: 'pixelated'
+                  }}
+                />
               </div>
             )}
-            <button
-              onClick={() => setShowCookingGame(false)}
-              style={{
-                width: '100%',
-                marginTop: '10px',
-                background: '#757575',
-                color: 'white',
-                border: 'none',
-                padding: '10px',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Fridge Popup */}
-      {showFridge && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowFridge(false)}
-        >
-          <div
-            style={{
-              background: 'white',
-              padding: '30px',
-              borderRadius: '16px',
-              maxWidth: '400px',
-              width: '90%'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ color: '#2196f3', marginTop: 0 }}>🧊 Fridge - Ingredients</h2>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                padding: '15px',
-                background: '#e3f2fd',
-                borderRadius: '8px',
-                marginBottom: '10px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span>🥛 Milk</span>
-                <span style={{ fontWeight: '600', fontSize: '18px' }}>{ingredients.milk}</span>
-              </div>
-              <div style={{
-                padding: '15px',
-                background: '#fff3e0',
-                borderRadius: '8px',
-                marginBottom: '10px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span>🌾 Flour</span>
-                <span style={{ fontWeight: '600', fontSize: '18px' }}>{ingredients.flour}</span>
-              </div>
-              <div style={{
-                padding: '15px',
-                background: '#ffebee',
-                borderRadius: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span>🍎 Apple</span>
-                <span style={{ fontWeight: '600', fontSize: '18px' }}>{ingredients.apple}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowFridge(false)}
+            {/* Yuwon sprite */}
+            <img
+              src={direction === 'up'
+                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Backanimation.gif'
+                : direction === 'down'
+                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Frontanimation.gif'
+                : '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit1animation.gif'}
+              alt="Yuwon"
               style={{
-                width: '100%',
-                background: '#2196f3',
-                color: 'white',
-                border: 'none',
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: isWalking ? 'block' : 'none',
+                transform: direction === 'left' ? 'scaleX(-1)' : 'none'
+              }}
+            />
+            <img
+              src="/images/walking-sprites/Yuwon/Idle/Yuwon_Idle_Outfit1animation.gif"
+              alt="Yuwon idle"
+              style={{
+                height: 'auto',
+                imageRendering: 'pixelated',
+                display: isWalking ? 'none' : 'block'
+              }}
+            />
+          </div>
+
+          {/* E prompt for Noah */}
+          {nearbyCharacter === 'noah' && !showVNDialogue && (
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: `${noah.y - 30}px`,
+              transform: 'translateX(-50%)',
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: '700',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              animation: 'bounce 1s ease-in-out infinite',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to Talk
+            </div>
+          )}
+
+          {/* VN Dialogue */}
+          {showVNDialogue && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '85%',
+                maxWidth: '500px',
+                zIndex: 1000,
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-end',
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '16px',
                 padding: '12px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer'
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
               }}
             >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+              {/* Character portrait */}
+              <div style={{ flexShrink: 0, width: '90px' }}>
+                <img
+                  src={vnDialogueType === 'noah'
+                    ? "/images/vn_sprites_head/portrait_noah_neutral.png"
+                    : "/images/vn_sprites_head/portrait_yuwon_smile.png"}
+                  alt={vnDialogueType === 'noah' ? 'Noah' : 'Yuwon'}
+                  style={{
+                    width: '90px',
+                    height: 'auto',
+                    display: 'block'
+                  }}
+                />
+              </div>
 
-      {/* Characters & Outfits Section - Below Room */}
-      <div className="content" style={{ marginTop: '40px' }}>
-        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <div style={{
-            background: '#fff0f5',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              🏠 <span style={{ fontWeight: '600', color: '#333' }}>Yuwon's Room</span>
-            </div>
-          </div>
-
-          <h3 style={{ fontSize: '18px', color: '#e91e63', marginBottom: '15px' }}>
-            Characters & Outfits
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-            {[
-              { name: 'yuwon', unlocked: true },
-              { name: 'jaehyun', unlocked: true },
-              { name: 'minkyu', unlocked: true },
-              { name: 'noah', unlocked: true }
-            ].map(({ name: char, unlocked }) => (
-              <div key={char} style={{ display: 'flex', gap: '30px', padding: '20px', background: '#fafafa', borderRadius: '12px', opacity: unlocked ? 1 : 0.6 }}>
-                <div style={{ textAlign: 'center', minWidth: '150px' }}>
-                  <img
-                    src={`/images/avatar_${char}.jpg`}
-                    alt={char}
-                    style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', marginBottom: '10px', border: '3px solid #e91e63' }}
-                  />
-                  <h2 style={{ fontSize: '18px', textTransform: 'capitalize', marginBottom: '4px', color: '#333' }}>
-                    {char}
-                  </h2>
+              {/* Dialogue content */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Character name */}
+                <div style={{
+                  background: vnDialogueType === 'noah'
+                    ? 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)'
+                    : 'linear-gradient(135deg, #e1bee7 0%, #ce93d8 100%)',
+                  color: vnDialogueType === 'noah' ? 'white' : '#4a148c',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  alignSelf: 'flex-start'
+                }}>
+                  {vnDialogueType === 'noah' ? 'Noah' : 'Yuwon'}
                 </div>
 
-                <div style={{ textAlign: 'center', minWidth: '120px' }}>
-                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px', fontWeight: '600' }}>
-                    Default Outfit
-                  </div>
-                  <img
-                    src={getCharacterSprite(char, characterOutfits[char])}
-                    alt={char}
-                    style={{ width: '60px', height: 'auto', objectFit: 'contain', imageRendering: 'pixelated', marginBottom: '8px' }}
-                  />
+                {/* Dialogue text */}
+                <div style={{
+                  color: '#666',
+                  fontSize: '12px',
+                  lineHeight: '1.4',
+                  fontWeight: '500'
+                }}>
+                  {vnDialogueType === 'noah' && dialogueMode === 'menu'
+                    ? "What do you want?"
+                    : vnDialogueType === 'noah' && dialogueMode === 'talk'
+                    ? noahMessages[currentNoahMessage]
+                    : vnDialogueType === 'stove'
+                    ? "I'm feeling like cooking! ✨"
+                    : vnDialogueType === 'fridge'
+                    ? "Let me see what's inside~ 🌸"
+                    : "Let's see what I cooked! 🍽️"}
+                </div>
+
+                {/* Buttons */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {vnDialogueType === 'noah' && dialogueMode === 'menu' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setDialogueMode('talk');
+                          setCurrentNoahMessage(Math.floor(Math.random() * noahMessages.length));
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #673ab7 0%, #512da8 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                      >
+                        💬 Talk
+                      </button>
+                      {heldItem && (
+                        <button
+                          onClick={() => {
+                            const reaction = getGiftReaction('noah', heldItem.id);
+                            giftDish('noah', heldItem.id);
+                            addFriendshipPoints('noah', reaction.points);
+                            setGiftReaction(reaction);
+                            setHeldItem(null);
+                            setDialogueMode('talk');
+                          }}
+                          style={{
+                            background: 'linear-gradient(135deg, #ff6b9d 0%, #e91e63 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                          🎁 Gift {heldItem.name}
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {vnDialogueType !== 'noah' && (
+                    <button
+                      onClick={() => {
+                        setShowVNDialogue(false);
+                        if (vnDialogueType === 'stove') setShowStoveModal(true);
+                        else if (vnDialogueType === 'fridge') setShowFridgeModal(true);
+                        else if (vnDialogueType === 'table') setShowTableModal(true);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #ff6b9d 0%, #e91e63 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                      onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                    >
+                      {vnDialogueType === 'stove' ? '🍳 Cook' : vnDialogueType === 'fridge' ? '🧊 Fridge' : '🍽️ Table'}
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => placeCharacter(char)}
-                    disabled={isCharacterPlaced(char)}
+                    onClick={() => {
+                      setShowVNDialogue(false);
+                      setDialogueMode('menu');
+                      setGiftReaction(null);
+                    }}
                     style={{
-                      padding: '8px 16px',
-                      background: isCharacterPlaced(char) ? '#999' : '#4caf50',
+                      background: 'linear-gradient(135deg, #d4a5ff 0%, #b18cdb 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '6px',
-                      cursor: isCharacterPlaced(char) ? 'not-allowed' : 'pointer',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
                       fontSize: '12px',
                       fontWeight: '600',
-                      width: '100%'
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s'
                     }}
+                    onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                    onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                   >
-                    {isCharacterPlaced(char) ? '✓ In Room' : '📍 Place'}
+                    {giftReaction ? '✓ Close' : 'Later~'}
                   </button>
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px' }}>
-                    {outfitsCatalog[char]?.map(outfit => {
-                      const owned = ownedOutfits[char]?.includes(outfit.id);
-                      const isActive = characterOutfits[char] === outfit.id;
-
-                      return (
-                        <div
-                          key={outfit.id}
-                          style={{
-                            border: isActive ? '2px solid #e91e63' : '1px solid #e0e0e0',
-                            borderRadius: '6px',
-                            padding: '6px',
-                            textAlign: 'center',
-                            background: owned ? (isActive ? '#fff0f5' : 'white') : 'white',
-                            cursor: owned ? 'pointer' : 'default'
-                          }}
-                          onClick={() => owned && changeOutfit(char, outfit.id)}
-                          title={outfit.name}
-                        >
-                          <img
-                            src={outfit.image}
-                            alt={outfit.name}
-                            style={{ width: '100%', height: 'auto', objectFit: 'contain', marginBottom: '4px', imageRendering: 'pixelated', opacity: owned ? 1 : 0.6 }}
-                          />
-                          <div style={{ fontSize: '9px', fontWeight: '600', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {outfit.name}
-                          </div>
-                          {!owned && outfit.price > 0 && (
-                            <>
-                              <div style={{ fontSize: '10px', color: '#ff9800', fontWeight: '700', marginBottom: '4px' }}>
-                                {outfit.price} YP
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  buyOutfit(char, outfit);
-                                }}
-                                style={{
-                                  background: '#4caf50',
-                                  color: 'white',
-                                  border: 'none',
-                                  padding: '3px 6px',
-                                  borderRadius: '3px',
-                                  cursor: 'pointer',
-                                  fontSize: '9px',
-                                  width: '100%'
-                                }}
-                              >
-                                Buy
-                              </button>
-                            </>
-                          )}
-                          {owned && (
-                            <div style={{ fontSize: '8px', color: isActive ? '#e91e63' : '#4caf50', fontWeight: '600' }}>
-                              {isActive ? '✓ Wearing' : '✓ Owned'}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                {/* Gift reaction */}
+                {giftReaction && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    background: giftReaction.points >= 15 ? '#e8f5e9' : giftReaction.points >= 5 ? '#fff8e1' : '#ffebee',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    color: '#333'
+                  }}>
+                    <div style={{ fontWeight: '700', marginBottom: '4px' }}>
+                      {giftReaction.points >= 15 ? '💖 Loved it!' : giftReaction.points >= 5 ? '😊 Liked it' : '😐 Not a fan'} (+{giftReaction.points} points)
+                    </div>
+                    <div>{giftReaction.message}</div>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Places section */}
+        <div style={{ marginTop: '40px' }}>
+          <h3 style={{ fontSize: '18px', color: '#e91e63', marginBottom: '20px', textAlign: 'center' }}>
+            🏪 PLACES
+          </h3>
+          <div style={{
+            display: 'flex',
+            gap: '25px',
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+            flexWrap: 'wrap'
+          }}>
+            {placesConfig.map(place => (
+              <div
+                key={place.id}
+                onClick={() => navigate(place.route)}
+                style={{
+                  width: '140px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.3s, box-shadow 0.3s',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  const img = e.currentTarget.querySelector('img');
+                  if (img) img.style.transform = 'scale(1.15)';
+                }}
+                onMouseLeave={(e) => {
+                  const img = e.currentTarget.querySelector('img');
+                  if (img) img.style.transform = 'scale(1)';
+                }}
+              >
+                <div style={{
+                  width: '100%',
+                  height: '140px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'visible',
+                  position: 'relative'
+                }}>
+                  <img
+                    src={place.icon}
+                    alt={place.name}
+                    style={{
+                      width: '80%',
+                      height: '80%',
+                      objectFit: 'contain',
+                      imageRendering: 'pixelated',
+                      transition: 'transform 0.3s'
+                    }}
+                  />
+                </div>
+                <div style={{
+                  marginTop: '12px',
+                  textAlign: 'center',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: '#333'
+                }}>
+                  {place.name}
+                </div>
+                <div style={{
+                  marginTop: '4px',
+                  textAlign: 'center',
+                  fontSize: '12px',
+                  color: '#666'
+                }}>
+                  {place.description}
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
-      </div>
+
+      {/* MODALS WILL GO HERE - To be added next */}
     </div>
   );
 }
