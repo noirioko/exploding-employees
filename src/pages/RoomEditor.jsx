@@ -6,7 +6,7 @@ import { recipes, canCookRecipe, getRecipeById } from '../data/recipes';
 import { getItemById } from '../data/shopItems';
 import { getGiftReaction, getHeartCount } from '../data/giftPreferences';
 
-function Room() {
+function RoomEditor() {
   const {
     yuCash,
     setYuCash,
@@ -2187,4 +2187,4 @@ function Room() {
   );
 }
 
-export default Room;
+export default RoomEditor;

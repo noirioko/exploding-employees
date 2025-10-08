@@ -6,6 +6,7 @@ import Record from './pages/Record';
 import Company from './pages/Company';
 import Story from './pages/Story';
 import Room from './pages/Room';
+import RoomEditor from './pages/RoomEditor';
 import Supermarket from './pages/Supermarket';
 import Paycheck from './pages/Paycheck';
 import SelfCare from './pages/SelfCare';
@@ -65,6 +66,7 @@ function App() {
               <Route path="/company" element={<Company />} />
               <Route path="/story" element={<Story />} />
               <Route path="/room" element={<Room />} />
+              <Route path="/room-editor" element={<RoomEditor />} />
               <Route path="/supermarket" element={<Supermarket />} />
               <Route path="/paycheck" element={<Paycheck />} />
               <Route path="/selfcare" element={<SelfCare />} />
