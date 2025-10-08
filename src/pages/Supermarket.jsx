@@ -171,6 +171,53 @@ function Supermarket() {
               ))}
             </div>
 
+            {/* Buy All Button */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <button
+                onClick={() => {
+                  const allSupermarketItems = getItemsByShop('supermarket');
+                  let totalCost = 0;
+                  allSupermarketItems.forEach(item => {
+                    totalCost += item.price * 10; // 10 of each item
+                  });
+
+                  if (yuCash < totalCost) {
+                    setNotification({ message: `❌ Not enough YuCash! Need ${totalCost} but have ${yuCash}`, type: 'error' });
+                    setTimeout(() => setNotification(null), 3000);
+                    return;
+                  }
+
+                  // Buy all items
+                  allSupermarketItems.forEach(item => {
+                    buyIngredient(item.id, 10, item.price);
+                  });
+
+                  setNotification({ message: `🎉 Bought 10 of EVERY ingredient! Spent ${totalCost} YuCash`, type: 'success' });
+                  setTimeout(() => setNotification(null), 3000);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(255, 152, 0, 0.4)',
+                  transition: 'transform 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'scale(1)';
+                }}
+              >
+                🛒 Buy All Ingredients (x10 each)
+              </button>
+            </div>
+
             <div style={{
               background: 'white',
               borderRadius: '12px',

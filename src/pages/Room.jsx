@@ -11,7 +11,9 @@ function Room() {
     yuCash,
     setYuCash,
     ingredients,
+    setIngredients,
     cookedDishes,
+    setCookedDishes,
     discoveredRecipes,
     cookRecipe,
     giftDish,
@@ -97,7 +99,7 @@ function Room() {
   const [cropDragHandle, setCropDragHandle] = useState(null);
 
   // Kitchen island state (food status)
-  const hasFood = cookedDishes && cookedDishes.length > 0;
+  const hasFood = cookedDishes && Object.keys(cookedDishes).length > 0;
 
   // NPC dialogue messages
   const noahMessages = [
@@ -187,7 +189,9 @@ function Room() {
 
       // E key interaction
       if (key === 'e' && nearbyCharacterRef.current) {
-        if (nearbyCharacterRef.current === 'noah') {
+        const nearby = nearbyCharacterRef.current;
+
+        if (nearby === 'noah') {
           const yuwonX = positionRef.current.x;
           const noahX = noahRef.current.x;
           const faceDirection = yuwonX > noahX ? 'right' : 'left';
@@ -197,45 +201,35 @@ function Room() {
             direction: faceDirection,
             isWalking: false
           }));
+
+          // If holding an item, gift it to Noah
+          if (heldItem && heldItem.type === 'dish') {
+            const reaction = getGiftReaction('noah', heldItem.recipeId);
+            const points = getHeartCount(reaction);
+
+            addFriendshipPoints('noah', points);
+            setGiftReaction({ character: 'noah', reaction, points });
+            setHeldItem(null);
+
+            // Show reaction for 3 seconds
+            setTimeout(() => setGiftReaction(null), 3000);
+          } else {
+            // Normal talk
+            setVNDialogueType('noah');
+            setDialogueMode('menu');
+            setShowVNDialogue(true);
+          }
+        } else if (nearby === 'fridge') {
+          setShowFridgeModal(true);
+        } else if (nearby === 'stove') {
+          setShowStoveModal(true);
+        } else if (nearby === 'table') {
+          setShowTableModal(true);
         }
 
-        setVNDialogueType(nearbyCharacterRef.current);
-        setDialogueMode('menu');
-        setShowVNDialogue(true);
         e.preventDefault();
       }
 
-      // Toggle helpers with H key
-      if (key === 'h') {
-        setShowHelpers(prev => !prev);
-        setShowHitbox(prev => !prev);
-      }
-
-      // Toggle coordinates with C key
-      if (key === 'c') {
-        setShowCoordinates(prev => !prev);
-        e.preventDefault();
-      }
-
-      // Toggle edit mode with E key (when not near character)
-      if (key === 'e' && !nearbyCharacterRef.current) {
-        setEditMode(prev => !prev);
-        setSelectedZone(null);
-        e.preventDefault();
-      }
-
-      // Delete selected zone with Delete key
-      if ((key === 'delete' || e.key === 'Delete') && selectedZone !== null && editMode) {
-        setCollisionZones(prev => prev.filter((_, i) => i !== selectedZone));
-        setSelectedZone(null);
-        e.preventDefault();
-      }
-
-      // Save zones with S key (when in edit mode)
-      if (key === 's' && editMode) {
-        e.preventDefault();
-        saveZonesToFile();
-      }
     };
 
     const handleKeyUp = (e) => {
@@ -319,7 +313,7 @@ function Room() {
         }
       }
 
-      // Check proximity to Noah (throttled)
+      // Check proximity to Noah and interaction zones (throttled)
       proximityCheckCounter.current++;
       if (proximityCheckCounter.current >= 10) {
         proximityCheckCounter.current = 0;
@@ -334,14 +328,37 @@ function Room() {
         const enterDistance = 45;
         const exitDistance = 60;
 
-        if (wasNearby) {
-          if (distanceToNoah > exitDistance) {
-            setNearbyCharacter(null);
+        // Check Noah proximity
+        let nearestInteractable = null;
+        let nearestDistance = Infinity;
+
+        if (distanceToNoah < enterDistance) {
+          nearestInteractable = 'noah';
+          nearestDistance = distanceToNoah;
+        }
+
+        // Check interaction zone proximity (fridge, stove, table)
+        Object.entries(interactionZones).forEach(([name, zone]) => {
+          const zoneCenterX = zone.left + zone.width / 2;
+          const zoneCenterY = zone.top + zone.height / 2;
+          const distance = Math.sqrt(
+            Math.pow(positionRef.current.x - zoneCenterX, 2) +
+            Math.pow(positionRef.current.y - zoneCenterY, 2)
+          );
+
+          if (distance < 50 && distance < nearestDistance) {
+            nearestInteractable = name;
+            nearestDistance = distance;
           }
+        });
+
+        // Update nearby character/interactable
+        if (wasNearby && nearestDistance > exitDistance) {
+          setNearbyCharacter(null);
+        } else if (nearestInteractable) {
+          setNearbyCharacter(nearestInteractable);
         } else {
-          if (distanceToNoah < enterDistance) {
-            setNearbyCharacter('noah');
-          }
+          setNearbyCharacter(null);
         }
       }
 
@@ -1521,6 +1538,29 @@ function Room() {
             pointerEvents: 'none',
             zIndex: noah.y
           }}>
+            {/* Gift Reaction */}
+            {giftReaction && giftReaction.character === 'noah' && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '-40px',
+                transform: 'translateX(-50%)',
+                background: 'rgba(0, 0, 0, 0.85)',
+                color: 'white',
+                padding: '8px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                zIndex: 10000,
+                animation: 'fadeIn 0.3s ease-out',
+                border: '2px solid rgba(255, 255, 255, 0.4)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+              }}>
+                {giftReaction.reaction} {'❤️'.repeat(giftReaction.points / 50)}
+              </div>
+            )}
+
             <img
               src={noah.direction === 'up'
                 ? '/images/walking-sprites/Noah/Walking/walkback_noah.gif'
@@ -1643,7 +1683,76 @@ function Room() {
               animation: 'bounce 1s ease-in-out infinite',
               border: '2px solid rgba(255, 255, 255, 0.3)'
             }}>
-              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to Talk
+              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to {heldItem ? '🎁 Gift' : 'Talk'}
+            </div>
+          )}
+
+          {/* E prompt for Fridge */}
+          {nearbyCharacter === 'fridge' && !showFridgeModal && (
+            <div style={{
+              position: 'absolute',
+              left: `${interactionZones.fridge.left + interactionZones.fridge.width / 2}px`,
+              top: `${interactionZones.fridge.top - 10}px`,
+              transform: 'translateX(-50%)',
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: '700',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              animation: 'bounce 1s ease-in-out infinite',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to Open Fridge
+            </div>
+          )}
+
+          {/* E prompt for Stove */}
+          {nearbyCharacter === 'stove' && !showStoveModal && (
+            <div style={{
+              position: 'absolute',
+              left: `${interactionZones.stove.left + interactionZones.stove.width / 2}px`,
+              top: `${interactionZones.stove.top - 10}px`,
+              transform: 'translateX(-50%)',
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: '700',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              animation: 'bounce 1s ease-in-out infinite',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to Cook
+            </div>
+          )}
+
+          {/* E prompt for Table */}
+          {nearbyCharacter === 'table' && !showTableModal && (
+            <div style={{
+              position: 'absolute',
+              left: `${interactionZones.table.left + interactionZones.table.width / 2}px`,
+              top: `${interactionZones.table.top - 10}px`,
+              transform: 'translateX(-50%)',
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: '700',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10000,
+              animation: 'bounce 1s ease-in-out infinite',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to Check Dishes
             </div>
           )}
 
@@ -1844,268 +1953,54 @@ function Room() {
           )}
         </div>
 
-        {/* Furniture Mode Toggle Button */}
-        {!editMode && !furnitureMode && (
+        {/* Cheat Buttons */}
+        <div style={{ position: 'fixed', right: '20px', top: '80px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 10001 }}>
           <button
-            onClick={() => setFurnitureMode(true)}
+            onClick={() => {
+              setYuCash(prev => prev + 10000);
+              alert('💰 Added 10,000 YuCash!');
+            }}
             style={{
-              position: 'fixed',
-              left: '20px',
-              bottom: '20px',
-              padding: '12px 20px',
-              background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
+              padding: '10px 16px',
+              background: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0, 188, 212, 0.4)',
-              zIndex: 10001
+              boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)'
             }}
           >
-            🪑 Furniture Editor
+            💰 +10k YuCash
           </button>
-        )}
 
-        {/* Furniture Editor Panel */}
-        {furnitureMode && (
-          <div style={{
-            position: 'fixed',
-            left: '20px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'rgba(0, 255, 255, 0.95)',
-            padding: '16px',
-            borderRadius: '12px',
-            zIndex: 10002,
-            minWidth: '200px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-          }}>
-            <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '12px', color: '#000' }}>
-              🪑 FURNITURE EDITOR
-            </div>
+          <button
+            onClick={() => {
+              const allItems = {};
+              const supermarketItems = require('../data/shopItems').shopItems.supermarket || [];
+              supermarketItems.forEach(item => {
+                allItems[item.id] = 10;
+              });
+              setIngredients(allItems);
+              alert('✨ Given 10 of each ingredient!');
+            }}
+            style={{
+              padding: '10px 16px',
+              background: 'linear-gradient(135deg, #ff4081 0%, #f50057 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(255, 64, 129, 0.4)'
+            }}
+          >
+            🎁 Get Ingredients
+          </button>
+        </div>
 
-            <button
-              onClick={handleAddFurniture}
-              style={{
-                width: '100%',
-                padding: '8px',
-                marginBottom: '8px',
-                background: '#4caf50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              + Add Image
-            </button>
-
-            <button
-              onClick={() => setShowFurnitureOverlay(prev => !prev)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                marginBottom: '8px',
-                background: showFurnitureOverlay ? '#ff9800' : '#757575',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              {showFurnitureOverlay ? '👁️ Hide' : '👁️ Show'} Overlay
-            </button>
-
-            {selectedFurniture !== null && furnitureItems[selectedFurniture] && (
-              <div style={{
-                marginTop: '12px',
-                padding: '8px',
-                background: 'rgba(255, 255, 255, 0.9)',
-                borderRadius: '6px',
-                fontSize: '11px'
-              }}>
-                <div style={{ fontWeight: '700', marginBottom: '8px' }}>Selected Item</div>
-
-                <button
-                  onClick={() => setCropMode(prev => !prev)}
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    marginBottom: '8px',
-                    background: cropMode ? '#ffeb3b' : '#9c27b0',
-                    color: cropMode ? 'black' : 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {cropMode ? '✂️ Crop Mode ON' : '✂️ Enable Crop Mode'}
-                </button>
-
-                <div style={{ marginBottom: '4px' }}>
-                  <label style={{ display: 'block', fontWeight: '600' }}>Z-Index:</label>
-                  <input
-                    type="number"
-                    value={furnitureItems[selectedFurniture].zIndex}
-                    onChange={(e) => {
-                      const newZ = parseInt(e.target.value);
-                      setFurnitureItems(prev => {
-                        const updated = [...prev];
-                        updated[selectedFurniture] = {
-                          ...updated[selectedFurniture],
-                          zIndex: newZ
-                        };
-                        return updated;
-                      });
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '4px',
-                      marginTop: '2px',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc'
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginTop: '8px' }}>
-                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>Crop:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                    <div>
-                      <label style={{ fontSize: '10px' }}>X:</label>
-                      <input
-                        type="number"
-                        value={furnitureItems[selectedFurniture].crop.x}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setFurnitureItems(prev => {
-                            const updated = [...prev];
-                            updated[selectedFurniture].crop.x = val;
-                            return updated;
-                          });
-                        }}
-                        style={{ width: '100%', padding: '2px', fontSize: '10px' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px' }}>Y:</label>
-                      <input
-                        type="number"
-                        value={furnitureItems[selectedFurniture].crop.y}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setFurnitureItems(prev => {
-                            const updated = [...prev];
-                            updated[selectedFurniture].crop.y = val;
-                            return updated;
-                          });
-                        }}
-                        style={{ width: '100%', padding: '2px', fontSize: '10px' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px' }}>W:</label>
-                      <input
-                        type="number"
-                        value={furnitureItems[selectedFurniture].crop.width}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setFurnitureItems(prev => {
-                            const updated = [...prev];
-                            updated[selectedFurniture].crop.width = val;
-                            return updated;
-                          });
-                        }}
-                        style={{ width: '100%', padding: '2px', fontSize: '10px' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px' }}>H:</label>
-                      <input
-                        type="number"
-                        value={furnitureItems[selectedFurniture].crop.height}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setFurnitureItems(prev => {
-                            const updated = [...prev];
-                            updated[selectedFurniture].crop.height = val;
-                            return updated;
-                          });
-                        }}
-                        style={{ width: '100%', padding: '2px', fontSize: '10px' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setFurnitureItems(prev => prev.filter((_, i) => i !== selectedFurniture));
-                    setSelectedFurniture(null);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    marginTop: '8px',
-                    background: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete Item
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={saveFurnitureToCode}
-              style={{
-                width: '100%',
-                padding: '8px',
-                marginTop: '12px',
-                background: '#2196f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              💾 Export Code
-            </button>
-
-            <button
-              onClick={() => setFurnitureMode(false)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                marginTop: '8px',
-                background: '#9e9e9e',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Close Editor
-            </button>
-          </div>
-        )}
 
         {/* Places section */}
         <div style={{ marginTop: '40px' }}>
@@ -2182,7 +2077,273 @@ function Room() {
         </div>
       </div>
 
-      {/* MODALS WILL GO HERE - To be added next */}
+      {/* Fridge Modal - Display all ingredients */}
+      {showFridgeModal && (
+        <div className="modal active" onClick={() => setShowFridgeModal(false)}>
+          <div className="modal-overlay"></div>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h3>🧊 Fridge - Your Ingredients</h3>
+              <button className="close-btn" onClick={() => setShowFridgeModal(false)}>✕</button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {Object.keys(ingredients).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                  Your fridge is empty! Visit the supermarket to buy ingredients.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '15px' }}>
+                  {Object.entries(ingredients).map(([itemId, amount]) => {
+                    const item = getItemById(itemId);
+                    if (!item || amount === 0) return null;
+                    return (
+                      <div key={itemId} style={{
+                        padding: '10px',
+                        border: '2px solid #e0e0e0',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        background: '#fff',
+                        position: 'relative'
+                      }}>
+                        <img src={item.image} alt={item.name} style={{ width: '60px', height: '60px', imageRendering: 'pixelated', marginBottom: '8px' }} />
+                        <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>{item.name}</div>
+                        <div style={{
+                          position: 'absolute',
+                          top: '5px',
+                          right: '5px',
+                          background: '#4caf50',
+                          color: 'white',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          fontSize: '11px',
+                          fontWeight: 'bold'
+                        }}>
+                          x{amount}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stove Modal - Recipe book with ingredient requirements */}
+      {showStoveModal && (
+        <div className="modal active" onClick={() => setShowStoveModal(false)}>
+          <div className="modal-overlay"></div>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', maxHeight: '85vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h3>🔥 Stove - Recipe Book</h3>
+              <button className="close-btn" onClick={() => setShowStoveModal(false)}>✕</button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '20px', padding: '10px', background: '#fff3cd', borderRadius: '8px', fontSize: '14px' }}>
+                💡 Hover over ingredients to see what you have!
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                {recipes.filter(r => r.discovered).map((recipe) => {
+                  const canCook = canCookRecipe(recipe, ingredients);
+                  return (
+                    <div key={recipe.id} style={{
+                      padding: '15px',
+                      border: `3px solid ${canCook ? '#4caf50' : '#ddd'}`,
+                      borderRadius: '12px',
+                      background: canCook ? '#f1f8f4' : '#fafafa',
+                      position: 'relative'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', marginBottom: '12px' }}>
+                        <img src={recipe.image} alt={recipe.name} style={{ width: '80px', height: '80px', imageRendering: 'pixelated', flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{recipe.name}</h4>
+                          <p style={{ margin: 0, fontSize: '12px', color: '#666', lineHeight: '1.4' }}>{recipe.description}</p>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e0e0e0' }}>
+                        <div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '8px', color: '#333' }}>Required Ingredients:</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {recipe.ingredients.map((reqIng) => {
+                            const item = getItemById(reqIng.id);
+                            const playerAmount = ingredients[reqIng.id] || 0;
+                            const hasEnough = playerAmount >= reqIng.amount;
+                            return (
+                              <div
+                                key={reqIng.id}
+                                onMouseEnter={(e) => {
+                                  setHoveredRecipe(reqIng.id);
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top - 10 });
+                                }}
+                                onMouseLeave={() => setHoveredRecipe(null)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 8px',
+                                  background: hasEnough ? '#e8f5e9' : '#ffebee',
+                                  border: `2px solid ${hasEnough ? '#4caf50' : '#f44336'}`,
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  position: 'relative',
+                                  cursor: 'help'
+                                }}
+                              >
+                                <img src={item?.image} alt={item?.name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated' }} />
+                                <span>{playerAmount}/{reqIng.amount}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {canCook && (
+                        <button
+                          onClick={() => {
+                            const success = cookRecipe(recipe.id, recipe);
+                            if (success) {
+                              alert(`✨ You cooked ${recipe.name}!`);
+                            }
+                          }}
+                          style={{
+                            marginTop: '12px',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#4caf50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🍳 Cook {recipe.name}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ingredient Tooltip */}
+      {hoveredRecipe && (
+        <div style={{
+          position: 'fixed',
+          left: `${tooltipPosition.x}px`,
+          top: `${tooltipPosition.y}px`,
+          transform: 'translate(-50%, -100%)',
+          background: 'rgba(0, 0, 0, 0.9)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          fontWeight: '600',
+          pointerEvents: 'none',
+          zIndex: 10000,
+          whiteSpace: 'nowrap'
+        }}>
+          {getItemById(hoveredRecipe)?.name || 'Unknown Item'}
+          <br />
+          <span style={{ fontSize: '11px', opacity: 0.8 }}>
+            You have: {ingredients[hoveredRecipe] || 0}
+          </span>
+        </div>
+      )}
+
+      {/* Table Modal - Display cooked dishes */}
+      {showTableModal && (
+        <div className="modal active" onClick={() => setShowTableModal(false)}>
+          <div className="modal-overlay"></div>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h3>🍽️ Table - Cooked Dishes</h3>
+              <button className="close-btn" onClick={() => setShowTableModal(false)}>✕</button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {Object.keys(cookedDishes).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                  No dishes on the table yet! Cook something at the stove first.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+                  {Object.entries(cookedDishes).map(([recipeId, quantity]) => {
+                    const recipe = recipes.find(r => r.id === recipeId);
+                    if (!recipe || quantity === 0) return null;
+                    return (
+                      <div key={recipeId} style={{
+                        padding: '15px',
+                        border: '3px solid #ff9800',
+                        borderRadius: '12px',
+                        background: '#fff8e1',
+                        textAlign: 'center',
+                        position: 'relative'
+                      }}>
+                        <img src={recipe.image} alt={recipe.name} style={{ width: '100px', height: '100px', imageRendering: 'pixelated', marginBottom: '10px' }} />
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{recipe.name}</h4>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666', lineHeight: '1.4' }}>{recipe.description}</p>
+                        <div style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          background: '#ff9800',
+                          color: 'white',
+                          borderRadius: '12px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          x{quantity}
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Pick up the dish
+                            setHeldItem({
+                              type: 'dish',
+                              recipeId: recipeId,
+                              name: recipe.name,
+                              image: recipe.image
+                            });
+
+                            // Remove one from inventory
+                            const newDishes = { ...cookedDishes };
+                            newDishes[recipeId] -= 1;
+                            if (newDishes[recipeId] <= 0) {
+                              delete newDishes[recipeId];
+                            }
+                            setCookedDishes(newDishes);
+
+                            // Close modal
+                            setShowTableModal(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            background: '#4caf50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          👋 Take
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
