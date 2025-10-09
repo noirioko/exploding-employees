@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import InfoPopup from './InfoPopup';
 
-function FinanceLogs() {
+function FinanceLogs({ energyLevel }) {
   const { getTasksByType, addTask, deleteTask, completeTask } = useApp();
 
+  // Finance logs don't typically need energy filtering, but keep for consistency
   const financeLogs = getTasksByType('finance');
 
   const [newLog, setNewLog] = useState({
@@ -79,46 +80,44 @@ function FinanceLogs() {
 
   return (
     <div className="task-section section-finance" style={{ marginBottom: '30px' }}>
-      <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/images/Minkyu_1.png" alt="Minkyu" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'contain', border: '3px solid #c2185b', padding: '3px', background: 'white' }} />
-          <div style={{ textAlign: 'left' }}>
-            <h3 style={{ fontSize: '18px', color: '#c2185b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              💰 Finance Logs (Draft)
-              <InfoPopup
-                title="📝 Finance Draft System"
-                content={
-                  <>
-                    <p style={{ marginBottom: '8px' }}><strong>How it works:</strong></p>
-                    <p style={{ marginBottom: '8px' }}>• Add expenses/income here as <strong>drafts</strong></p>
-                    <p style={{ marginBottom: '8px' }}>• Drafts are <strong>NOT permanent</strong> - edit/delete anytime</p>
-                    <p style={{ marginBottom: '8px' }}>• Click "📋 Record" to move to Record tab</p>
-                    <p style={{ marginBottom: '0' }}>• Recording gives Minkyu <strong>EXP points!</strong> 💪</p>
-                  </>
-                }
-              />
-            </h3>
-            <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>Track expenses & income, then record them!</p>
-          </div>
+
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        marginBottom: '0px',
+        marginLeft: '50px',
+        borderRadius: '8px 8px 0 0',
+        overflow: 'hidden',
+        boxShadow: '0 -2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{
+          width: '60px',
+          background: '#00897b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}>
+          <img src="/images/Minkyu_1.png" alt="Minkyu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
         </div>
-        {financeLogs.length > 0 && (
-          <button
-            onClick={handleRecordAll}
-            style={{
-              padding: '10px 20px',
-              background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)',
-            }}
-          >
-            📋 Record All ({financeLogs.length})
-          </button>
-        )}
+        <div style={{ padding: '12px 20px', background: '#e0f2f1' }}>
+          <h3 style={{ fontSize: '18px', color: '#00897b', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            💰 Finance Logs (Draft)
+            <InfoPopup
+              title="📝 Finance Draft System"
+              content={
+                <>
+                  <p style={{ marginBottom: '8px' }}><strong>How it works:</strong></p>
+                  <p style={{ marginBottom: '8px' }}>• Add expenses/income here as <strong>drafts</strong></p>
+                  <p style={{ marginBottom: '8px' }}>• Drafts are <strong>NOT permanent</strong> - edit/delete anytime</p>
+                  <p style={{ marginBottom: '8px' }}>• Click "📋 Record" to move to Record tab</p>
+                  <p style={{ marginBottom: '0' }}>• Recording gives Minkyu <strong>EXP points!</strong> 💪</p>
+                </>
+              }
+            />
+          </h3>
+          <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Track expenses & income, then record them!</p>
+        </div>
       </div>
 
       <div className="tasks-table">
@@ -127,17 +126,25 @@ function FinanceLogs() {
           <div className="col-deadline" style={{ minWidth: '100px' }}>Date</div>
           <div className="col-deadline" style={{ minWidth: '150px' }}>Category</div>
           <div className="col-deadline">Amount</div>
-          <div className="col-actions">Actions</div>
+          <div className="col-check">Log!</div>
+          <div className="col-actions">Settings</div>
         </div>
 
         <div className="table-body">
           {financeLogs.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">💰</div>
-              <p>No finance logs yet! Add expenses or income below.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                <img
+                  src="/images/cat_finance1.png"
+                  alt="Cat finance"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+                <p>No finance logs yet! Add expenses or income below.</p>
+              </div>
             </div>
           ) : (
-            financeLogs.map(log => (
+            <>
+              {financeLogs.map(log => (
               <div key={log.id} className="task-row">
                 <div className="col-task">
                   <span className="task-text">{log.text}</span>
@@ -151,7 +158,7 @@ function FinanceLogs() {
                 <div className="col-deadline" style={{ fontSize: '16px', fontWeight: '700', color: log.amount > 0 ? '#4caf50' : '#ff5252' }}>
                   {log.amount > 0 ? '+' : ''}{log.amount} ₩
                 </div>
-                <div className="col-actions">
+                <div className="col-check">
                   <button
                     className="done-btn task-btn"
                     onClick={() => completeTask(log.id)}
@@ -159,6 +166,8 @@ function FinanceLogs() {
                   >
                     📋 Record
                   </button>
+                </div>
+                <div className="col-actions">
                   <button
                     className="delete-btn task-btn"
                     onClick={() => deleteTask(log.id)}
@@ -167,9 +176,62 @@ function FinanceLogs() {
                   </button>
                 </div>
               </div>
-            ))
+              ))}
+
+              {/* Cat at bottom based on progress */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '20px',
+                borderTop: '2px dashed #e0e0e0'
+              }}>
+                <img
+                  src={
+                    financeLogs.length === 0 ? '/images/cat_finance1.png' :
+                    financeLogs.length <= 5 ? '/images/cat_finance2.png' :
+                    '/images/cat_finance3.png'
+                  }
+                  alt="Cat"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+              </div>
+            </>
           )}
         </div>
+
+        {/* Action Bar - Like invoice totals */}
+        {financeLogs.length > 0 && (
+          <div style={{
+            marginTop: '15px',
+            padding: '15px 20px',
+            background: '#f5f5f5',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', fontWeight: 600 }}>
+              Record now?
+            </div>
+            <button
+              onClick={handleRecordAll}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)',
+              }}
+            >
+              📋 Record All ({financeLogs.length})
+            </button>
+          </div>
+        )}
 
         {/* Quick Add Row */}
         <div className="quick-add-row" style={{ display: 'grid', gridTemplateColumns: '2fr 0.8fr 1fr 1.5fr 1fr auto', gap: '10px', alignItems: 'center' }}>

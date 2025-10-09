@@ -6,6 +6,21 @@
   box-sizing: border-box;
 }
 
+@keyframes stamp {
+  0% {
+    transform: scale(0) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.5) rotate(-15deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-15deg);
+    opacity: 1;
+  }
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
@@ -26,6 +41,18 @@ body {
   margin: 0 auto;
   width: 100%;
   padding: 0 20px;
+}
+
+/* Circular button fix - prevent padding conflicts */
+button[style*="borderRadius: \"50%\""],
+button[style*='borderRadius: "50%"'],
+button[style*="border-radius: 50%"],
+.circular-btn {
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Header */
@@ -249,7 +276,7 @@ body {
 
 .table-header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: 15px;
   padding: 15px 20px;
   background: linear-gradient(135deg, #f8bbd0 0%, #ce93d8 100%);
@@ -268,7 +295,7 @@ body {
 
 .task-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: 15px;
   padding: 18px 20px;
   border-bottom: 2px solid #fce4ec;
@@ -395,6 +422,12 @@ body {
 .energy-dot.med { background: #f48fb1; }
 .energy-dot.high { background: #ffab91; }
 
+.col-check {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 .col-actions {
   display: flex;
   gap: 8px;
@@ -453,7 +486,7 @@ body {
 /* Quick Add Row */
 .quick-add-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: 15px;
   padding: 15px 20px;
   background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 100%);
@@ -549,6 +582,9 @@ body {
   border-radius: 50%;
   width: 30px;
   height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 !important;
   font-size: 18px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -556,6 +592,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .calendar-nav-btn:hover {

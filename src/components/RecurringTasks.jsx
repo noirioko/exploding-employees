@@ -2,10 +2,17 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import EditTaskModal from './EditTaskModal';
 
-function RecurringTasks() {
-  const { getTasksByType, addTask, completeTask, deleteTask, updateTask, logHabit } = useApp();
+function RecurringTasks({ energyLevel }) {
+  const { getTasksByType, addTask, completeTask, deleteTask, updateTask, logHabit, completedTasks } = useApp();
 
-  const recurringTasks = getTasksByType('recurring');
+  const allRecurringTasks = getTasksByType('recurring');
+
+  // Filter tasks based on energy level
+  const recurringTasks = allRecurringTasks.filter(task => {
+    if (energyLevel <= 3) return task.energy === 'low';
+    if (energyLevel <= 6) return task.energy === 'low' || task.energy === 'med';
+    return true; // 7-10: show all tasks
+  });
 
   const [newTask, setNewTask] = useState({
     text: '',
@@ -20,7 +27,21 @@ function RecurringTasks() {
 
   const [editingTask, setEditingTask] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [completedTaskId, setCompletedTaskId] = useState(null);
+  const [sortBy, setSortBy] = useState('none');
+
+  // Check if a recurring task was logged today
+  const isLoggedToday = (taskId) => {
+    const today = new Date().toDateString();
+    return completedTasks.some(task =>
+      task.id === taskId &&
+      task.taskType === 'recurring' &&
+      new Date(task.completedAt).toDateString() === today
+    );
+  };
+
+  const handleTaskLog = (taskId) => {
+    logHabit(taskId);
+  };
 
   const handleAddTask = () => {
     if (newTask.text.trim()) {
@@ -55,12 +76,13 @@ function RecurringTasks() {
     setEditingTask(null);
   };
 
-  const handleComplete = (taskId) => {
-    setCompletedTaskId(taskId);
-    setTimeout(() => {
-      logHabit(taskId);
-      setCompletedTaskId(null);
-    }, 500);
+  // Check if any task was logged today
+  const hasLoggedToday = () => {
+    const today = new Date().toDateString();
+    return completedTasks.some(task =>
+      task.taskType === 'recurring' &&
+      new Date(task.completedAt).toDateString() === today
+    );
   };
 
   // Check if a task is due today
@@ -91,14 +113,105 @@ function RecurringTasks() {
     return isDue;
   };
 
+  // Sort tasks
+  const getSortedTasks = () => {
+    let sorted = [...recurringTasks];
+
+    if (sortBy === 'energy') {
+      const energyOrder = { low: 1, med: 2, high: 3 };
+      sorted.sort((a, b) => energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med']);
+    } else if (sortBy === 'category') {
+      sorted.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    }
+
+    return sorted;
+  };
+
+  const sortedTasks = getSortedTasks();
+
   return (
     <div className="task-section section-recurring" style={{ marginBottom: '30px' }}>
-      <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', justifyContent: 'flex-start' }}>
-        <img src="/images/Noah_1.png" alt="Noah" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'contain', border: '3px solid #e65100', padding: '3px', background: 'white' }} />
-        <div style={{ textAlign: 'left' }}>
-          <h3 style={{ fontSize: '18px', color: '#f57c00', margin: 0 }}>🔄 Recurring Tasks</h3>
-          <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>Noah oversees recurring responsibilities!</p>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginBottom: '0px',
+        marginLeft: '50px',
+        marginRight: '50px'
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'stretch',
+          borderRadius: '8px 8px 0 0',
+          overflow: 'hidden',
+          boxShadow: '0 -2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            width: '60px',
+            background: '#e65100',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <img src="/images/Noah_1.png" alt="Noah" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
+          </div>
+          <div style={{ padding: '12px 20px', background: '#fff3e0' }}>
+            <h3 style={{ fontSize: '18px', color: '#f57c00', margin: 0, fontWeight: 700 }}>🔄 Recurring Tasks</h3>
+            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Noah oversees recurring responsibilities!</p>
+          </div>
         </div>
+
+        {/* Sort Tabs - Right Side */}
+        {recurringTasks.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', paddingBottom: '8px' }}>
+            <button
+              onClick={() => setSortBy('none')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'none' ? '#e65100' : '#fff3e0',
+                color: sortBy === 'none' ? 'white' : '#f57c00',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Default
+            </button>
+            <button
+              onClick={() => setSortBy('energy')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'energy' ? '#e65100' : '#fff3e0',
+                color: sortBy === 'energy' ? 'white' : '#f57c00',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              ⚡ Energy
+            </button>
+            <button
+              onClick={() => setSortBy('category')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'category' ? '#e65100' : '#fff3e0',
+                color: sortBy === 'category' ? 'white' : '#f57c00',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              🏷️ Category
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tasks-table">
@@ -107,23 +220,31 @@ function RecurringTasks() {
           <div className="col-category">Category</div>
           <div className="col-deadline">Recurrence</div>
           <div className="col-energy">Energy</div>
-          <div className="col-actions">Actions</div>
+          <div className="col-check">Check!</div>
+          <div className="col-actions">Settings</div>
         </div>
 
         <div className="table-body">
           {recurringTasks.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🔄</div>
-              <p>No recurring tasks yet! Add weekly or monthly tasks below.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                <img
+                  src="/images/cat_recurring.png"
+                  alt="Cat waiting"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+                <p>No recurring tasks yet! Add weekly or monthly tasks below.</p>
+              </div>
             </div>
           ) : (
-            recurringTasks.map(task => {
+            <>
+              {sortedTasks.map(task => {
               const isDueToday = isTaskDueToday(task);
-              const isCompleting = completedTaskId === task.id;
+              const isLogged = isLoggedToday(task.id);
               return (
               <div
                 key={task.id}
-                className={`task-row ${isCompleting ? 'task-completing' : (isDueToday ? 'task-due-today' : '')}`}
+                className={`task-row ${isDueToday ? 'task-due-today' : ''}`}
               >
                 <div className="col-task">
                   <span className="task-text">{task.text}</span>
@@ -150,12 +271,40 @@ function RecurringTasks() {
                   {task.energy === 'med' && '☕ Med (2 exp)'}
                   {task.energy === 'high' && '⚡ High (3 exp)'}
                 </div>
+                <div className="col-check">
+                  <button
+                    className="done-btn task-btn"
+                    onClick={() => handleTaskLog(task.id)}
+                    style={{
+                      position: 'relative',
+                      opacity: isLogged ? 0.6 : 1
+                    }}
+                  >
+                    <span style={{ filter: isLogged ? 'grayscale(100%)' : 'none' }}>
+                      ✓ Done
+                    </span>
+                    {isLogged && (
+                      <img
+                        src="/images/stamp_chick.png"
+                        alt="Chick stamp"
+                        style={{
+                          position: 'absolute',
+                          top: '-5px',
+                          right: '-5px',
+                          width: '35px',
+                          height: '35px',
+                          objectFit: 'contain',
+                          transform: 'rotate(-15deg)',
+                          pointerEvents: 'none',
+                          animation: 'stamp 0.5s ease-out'
+                        }}
+                      />
+                    )}
+                  </button>
+                </div>
                 <div className="col-actions">
                   <button className="edit-btn task-btn" onClick={() => handleEditTask(task)}>
                     ✏️
-                  </button>
-                  <button className="done-btn task-btn" onClick={() => handleComplete(task.id)}>
-                    ✓ Done
                   </button>
                   <button className="delete-btn task-btn" onClick={() => deleteTask(task.id)}>
                     ✕
@@ -163,7 +312,22 @@ function RecurringTasks() {
                 </div>
               </div>
               );
-            })
+              })}
+
+              {/* Cat at bottom */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '20px',
+                borderTop: '2px dashed #e0e0e0'
+              }}>
+                <img
+                  src={hasLoggedToday() ? '/images/cat_recurring2.png' : '/images/cat_recurring.png'}
+                  alt="Cat"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+              </div>
+            </>
           )}
         </div>
 

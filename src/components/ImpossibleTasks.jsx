@@ -1,10 +1,19 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 
-function ImpossibleTasks() {
-  const { getTasksByType, addTask, completeTask, deleteTask } = useApp();
+function ImpossibleTasks({ energyLevel }) {
+  const { getTasksByType, addTask, completeTask, deleteTask, updateTask } = useApp();
 
-  const impossibleTasks = getTasksByType('impossible');
+  const allImpossibleTasks = getTasksByType('impossible');
+
+  // Filter tasks based on energy level
+  const impossibleTasks = allImpossibleTasks.filter(task => {
+    if (energyLevel <= 3) return task.energy === 'low';
+    if (energyLevel <= 6) return task.energy === 'low' || task.energy === 'med';
+    return true; // 7-10: show all tasks
+  });
+  const [stampedTasks, setStampedTasks] = useState(new Set());
+  const [sortBy, setSortBy] = useState('none');
 
   const [newTask, setNewTask] = useState({
     text: '',
@@ -12,6 +21,18 @@ function ImpossibleTasks() {
     energy: 'high',
     taskType: 'impossible',
   });
+
+  const handleDone = (taskId) => {
+    setStampedTasks(prev => new Set(prev).add(taskId));
+  };
+
+  const handleComplete = () => {
+    stampedTasks.forEach(taskId => {
+      completeTask(taskId);
+    });
+    setStampedTasks(new Set());
+  };
+
 
   const handleAddTask = () => {
     if (newTask.text.trim()) {
@@ -71,36 +92,119 @@ function ImpossibleTasks() {
     };
   };
 
+  // Sort tasks
+  const getSortedTasks = () => {
+    let sorted = [...impossibleTasks];
+
+    if (sortBy === 'energy') {
+      const energyOrder = { low: 1, med: 2, high: 3 };
+      sorted.sort((a, b) => energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med']);
+    }
+
+    return sorted;
+  };
+
+  const sortedTasks = getSortedTasks();
+
   return (
     <div className="task-section section-impossible" style={{ marginBottom: '30px' }}>
-      <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', justifyContent: 'flex-start' }}>
-        <div style={{ display: 'flex', marginLeft: '-10px' }}>
-          <img src="/images/Yuwon_1.png" alt="Yuwon" style={{ width: '45px', height: '45px', marginLeft: '10px', objectFit: 'contain', border: '2px solid #c62828', borderRadius: '50%', padding: '2px', background: 'white' }} />
-          <img src="/images/Noah_1.png" alt="Noah" style={{ width: '45px', height: '45px', marginLeft: '-8px', objectFit: 'contain', border: '2px solid #c62828', borderRadius: '50%', padding: '2px', background: 'white' }} />
-          <img src="/images/Minkyu_1.png" alt="Minkyu" style={{ width: '45px', height: '45px', marginLeft: '-8px', objectFit: 'contain', border: '2px solid #c62828', borderRadius: '50%', padding: '2px', background: 'white' }} />
-          <img src="/images/Jaehyun_1.png" alt="Jaehyun" style={{ width: '45px', height: '45px', marginLeft: '-8px', objectFit: 'contain', border: '2px solid #c62828', borderRadius: '50%', padding: '2px', background: 'white' }} />
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginBottom: '0px',
+        marginLeft: '50px',
+        marginRight: '50px'
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'stretch',
+          borderRadius: '8px 8px 0 0',
+          overflow: 'hidden',
+          boxShadow: '0 -2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            width: '60px',
+            background: '#c62828',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            position: 'relative'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px' }}>
+              <img src="/images/Yuwon_1.png" alt="Yuwon" style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '50%' }} />
+              <img src="/images/Noah_1.png" alt="Noah" style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '50%' }} />
+              <img src="/images/Minkyu_1.png" alt="Minkyu" style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '50%' }} />
+              <img src="/images/Jaehyun_1.png" alt="Jaehyun" style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '50%' }} />
+            </div>
+          </div>
+          <div style={{ padding: '12px 20px', background: '#ffebee' }}>
+            <h3 style={{ fontSize: '18px', color: '#c62828', margin: 0, fontWeight: 700 }}>⏰ Impossible Tasks</h3>
+            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Everyone's watching these... and judging. 👀</p>
+          </div>
         </div>
-        <div style={{ textAlign: 'left' }}>
-          <h3 style={{ fontSize: '18px', color: '#c62828', margin: 0 }}>⏰ Impossible Tasks</h3>
-          <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>Everyone's watching these... and judging. 👀</p>
-        </div>
+
+        {/* Sort Tabs - Right Side */}
+        {impossibleTasks.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', paddingBottom: '8px' }}>
+            <button
+              onClick={() => setSortBy('none')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'none' ? '#c62828' : '#ffebee',
+                color: sortBy === 'none' ? 'white' : '#c62828',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Default
+            </button>
+            <button
+              onClick={() => setSortBy('energy')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'energy' ? '#c62828' : '#ffebee',
+                color: sortBy === 'energy' ? 'white' : '#c62828',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              ⚡ Energy
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tasks-table">
         <div className="table-header">
           <div className="col-task">Impossible Task</div>
-          <div className="col-actions">Actions</div>
+          <div className="col-check">Check!</div>
+          <div className="col-actions">Settings</div>
         </div>
 
         <div className="table-body">
           {impossibleTasks.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">⏰</div>
-              <p>No impossible tasks! (That's probably good... right?)</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                <img
+                  src="/images/cat_impossibletask.png"
+                  alt="Cat waiting"
+                  style={{ width: '200px', height: '200px', objectFit: 'contain' }}
+                />
+                <p>No impossible tasks! (That's probably good... right?)</p>
+              </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '15px' }}>
-            {impossibleTasks.map(task => {
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '15px' }}>
+              {sortedTasks.map(task => {
               const nag = getEmployeeNag(task);
               const daysSinceCreated = Math.floor((Date.now() - new Date(task.createdAt)) / (1000 * 60 * 60 * 24));
 
@@ -149,14 +253,41 @@ function ImpossibleTasks() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="col-check">
                       <button
                         className="done-btn task-btn"
-                        onClick={() => completeTask(task.id)}
-                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={() => handleDone(task.id)}
+                        disabled={stampedTasks.has(task.id)}
+                        style={{
+                          fontSize: '12px',
+                          padding: '6px 12px',
+                          position: 'relative',
+                          opacity: stampedTasks.has(task.id) ? 0.6 : 1
+                        }}
                       >
-                        ✓ Finally Done!
+                        <span style={{ filter: stampedTasks.has(task.id) ? 'grayscale(100%)' : 'none' }}>
+                          ✓ Done
+                        </span>
+                        {stampedTasks.has(task.id) && (
+                          <img
+                            src="/images/stamp_catbank.png"
+                            alt="Cat bank stamp"
+                            style={{
+                              position: 'absolute',
+                              top: '-5px',
+                              right: '-5px',
+                              width: '35px',
+                              height: '35px',
+                              objectFit: 'contain',
+                              transform: 'rotate(-15deg)',
+                              pointerEvents: 'none',
+                              animation: 'stamp 0.5s ease-out'
+                            }}
+                          />
+                        )}
                       </button>
+                    </div>
+                    <div className="col-actions">
                       <button
                         className="delete-btn task-btn"
                         onClick={() => deleteTask(task.id)}
@@ -167,10 +298,59 @@ function ImpossibleTasks() {
                   </div>
                 </div>
               );
-            })}
-          </div>
+              })}
+              </div>
+
+              {/* Cat at bottom */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '20px',
+                borderTop: '2px dashed #e0e0e0'
+              }}>
+                <img
+                  src={impossibleTasks.length > 0 ? '/images/cat_impossibletask_2.png' : '/images/cat_impossibletask.png'}
+                  alt="Cat"
+                  style={{ width: '200px', height: '200px', objectFit: 'contain' }}
+                />
+              </div>
+            </>
           )}
         </div>
+
+        {/* Action Bar - Complete All */}
+        {stampedTasks.size > 0 && (
+          <div style={{
+            marginTop: '15px',
+            padding: '15px 20px',
+            background: '#f5f5f5',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', fontWeight: 600 }}>
+              Complete now?
+            </div>
+            <button
+              onClick={handleComplete}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)',
+              }}
+            >
+              🎉 Complete All ({stampedTasks.size})
+            </button>
+          </div>
+        )}
 
         {/* Quick Add Row */}
         <div className="quick-add-row">

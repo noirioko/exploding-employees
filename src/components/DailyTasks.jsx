@@ -2,10 +2,18 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import EditTaskModal from './EditTaskModal';
 
-function DailyTasks() {
+function DailyTasks({ energyLevel }) {
   const { getTasksByType, addTask, completeTask, deleteTask, updateTask } = useApp();
 
-  const dailyTasks = getTasksByType('daily');
+  const allDailyTasks = getTasksByType('daily');
+
+  // Filter tasks based on energy level
+  const dailyTasks = allDailyTasks.filter(task => {
+    if (energyLevel <= 3) return task.energy === 'low';
+    if (energyLevel <= 6) return task.energy === 'low' || task.energy === 'med';
+    return true; // 7-10: show all tasks
+  });
+  const [stampedTasks, setStampedTasks] = useState(new Set());
 
   const [newTask, setNewTask] = useState({
     text: '',
@@ -17,6 +25,31 @@ function DailyTasks() {
 
   const [editingTask, setEditingTask] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('none');
+
+  const handleDone = (taskId) => {
+    setStampedTasks(prev => new Set(prev).add(taskId));
+  };
+
+  const handleLogAll = () => {
+    stampedTasks.forEach(taskId => {
+      completeTask(taskId);
+    });
+    setStampedTasks(new Set());
+  };
+
+  const getCatImage = () => {
+    if (dailyTasks.length === 0) {
+      return '/images/cat_lyingdown.png';
+    }
+
+    // All tasks are stamped
+    if (stampedTasks.size === dailyTasks.length && dailyTasks.length > 0) {
+      return '/images/cat_finish_alltask.png';
+    }
+
+    return '/images/cat_task_true_nothingdone.png';
+  };
 
   const handleAddTask = () => {
     if (newTask.text.trim()) {
@@ -48,14 +81,138 @@ function DailyTasks() {
     setEditingTask(null);
   };
 
+  // Sort tasks
+  const getSortedTasks = () => {
+    let sorted = [...dailyTasks];
+
+    if (sortBy === 'dueDate') {
+      sorted.sort((a, b) => {
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    } else if (sortBy === 'energy') {
+      const energyOrder = { low: 1, med: 2, high: 3 };
+      sorted.sort((a, b) => energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med']);
+    } else if (sortBy === 'category') {
+      sorted.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    }
+
+    return sorted;
+  };
+
+  const sortedTasks = getSortedTasks();
+
+  // Check if deadline is urgent (within 2 days)
+  const isUrgent = (deadline) => {
+    if (!deadline) return false;
+    const deadlineDate = new Date(deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    const diffTime = deadlineDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 2; // Today, tomorrow, or day after
+  };
+
   return (
     <div className="task-section section-todolist" style={{ marginBottom: '30px' }}>
-      <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', justifyContent: 'flex-start' }}>
-        <img src="/images/Yuwon_1.png" alt="Yuwon" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'contain', border: '3px solid #5e35b1', padding: '3px', background: 'white' }} />
-        <div style={{ textAlign: 'left' }}>
-          <h3 style={{ fontSize: '18px', color: '#1976d2', margin: 0 }}>📝 To Do List</h3>
-          <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>Yuwon handles these!</p>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginBottom: '0px',
+        marginLeft: '50px',
+        marginRight: '50px'
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'stretch',
+          borderRadius: '8px 8px 0 0',
+          overflow: 'hidden',
+          boxShadow: '0 -2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            width: '60px',
+            background: '#5e35b1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <img src="/images/Yuwon_1.png" alt="Yuwon" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
+          </div>
+          <div style={{ padding: '12px 20px', background: '#e8eaf6' }}>
+            <h3 style={{ fontSize: '18px', color: '#5e35b1', margin: 0, fontWeight: 700 }}>📝 To Do List</h3>
+            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Yuwon handles these!</p>
+          </div>
         </div>
+
+        {/* Sort Tabs - Right Side */}
+        {dailyTasks.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', paddingBottom: '8px' }}>
+            <button
+              onClick={() => setSortBy('none')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'none' ? '#5e35b1' : '#e8eaf6',
+                color: sortBy === 'none' ? 'white' : '#5e35b1',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Default
+            </button>
+            <button
+              onClick={() => setSortBy('dueDate')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'dueDate' ? '#5e35b1' : '#e8eaf6',
+                color: sortBy === 'dueDate' ? 'white' : '#5e35b1',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              📅 Due Date
+            </button>
+            <button
+              onClick={() => setSortBy('energy')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'energy' ? '#5e35b1' : '#e8eaf6',
+                color: sortBy === 'energy' ? 'white' : '#5e35b1',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              ⚡ Energy
+            </button>
+            <button
+              onClick={() => setSortBy('category')}
+              style={{
+                padding: '6px 12px',
+                background: sortBy === 'category' ? '#5e35b1' : '#e8eaf6',
+                color: sortBy === 'category' ? 'white' : '#5e35b1',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              🏷️ Category
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="tasks-table">
@@ -64,20 +221,28 @@ function DailyTasks() {
           <div className="col-category">Category</div>
           <div className="col-deadline">Deadline</div>
           <div className="col-energy">Energy</div>
-          <div className="col-actions">Actions</div>
+          <div className="col-check">Check!</div>
+          <div className="col-actions">Settings</div>
         </div>
 
         <div className="table-body">
           {dailyTasks.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📝</div>
-              <p>No daily tasks yet! Add one below to get started.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                <img
+                  src="/images/cat_lyingdown.png"
+                  alt="Cat lying down"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+                <p>No daily tasks yet! Add one below to get started.</p>
+              </div>
             </div>
           ) : (
-            dailyTasks.map(task => (
+            <>
+              {sortedTasks.map(task => (
               <div key={task.id} className="task-row">
                 <div className="col-task">
-                  {task.priority && <span className="priority-badge">URGENT</span>}
+                  {isUrgent(task.deadline) && <span className="priority-badge">URGENT</span>}
                   <span className="task-text">{task.text}</span>
                 </div>
                 <div className="col-category">
@@ -95,21 +260,99 @@ function DailyTasks() {
                   {task.energy === 'med' && '☕ Med (2 exp)'}
                   {task.energy === 'high' && '⚡ High (3 exp)'}
                 </div>
+                <div className="col-check">
+                  <button
+                    className="done-btn task-btn"
+                    onClick={() => handleDone(task.id)}
+                    disabled={stampedTasks.has(task.id)}
+                    style={{
+                      position: 'relative',
+                      opacity: stampedTasks.has(task.id) ? 0.6 : 1
+                    }}
+                  >
+                    <span style={{ filter: stampedTasks.has(task.id) ? 'grayscale(100%)' : 'none' }}>
+                      ✓ Done
+                    </span>
+                    {stampedTasks.has(task.id) && (
+                      <img
+                        src="/images/stamp_fish.png"
+                        alt="Fish stamp"
+                        style={{
+                          position: 'absolute',
+                          top: '-5px',
+                          right: '-5px',
+                          width: '35px',
+                          height: '35px',
+                          objectFit: 'contain',
+                          transform: 'rotate(-15deg)',
+                          pointerEvents: 'none',
+                          animation: 'stamp 0.5s ease-out'
+                        }}
+                      />
+                    )}
+                  </button>
+                </div>
                 <div className="col-actions">
                   <button className="edit-btn task-btn" onClick={() => handleEditTask(task)}>
                     ✏️
-                  </button>
-                  <button className="done-btn task-btn" onClick={() => completeTask(task.id)}>
-                    ✓ Done
                   </button>
                   <button className="delete-btn task-btn" onClick={() => deleteTask(task.id)}>
                     ✕
                   </button>
                 </div>
               </div>
-            ))
+              ))}
+
+              {/* Cat at bottom */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '20px',
+                borderTop: '2px dashed #e0e0e0'
+              }}>
+                <img
+                  src={getCatImage()}
+                  alt="Cat"
+                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                />
+              </div>
+            </>
           )}
         </div>
+
+        {/* Action Bar - Log All */}
+        {stampedTasks.size > 0 && (
+          <div style={{
+            marginTop: '15px',
+            padding: '15px 20px',
+            background: '#f5f5f5',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', fontWeight: 600 }}>
+              Log now?
+            </div>
+            <button
+              onClick={handleLogAll}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)',
+              }}
+            >
+              📋 Log All ({stampedTasks.size})
+            </button>
+          </div>
+        )}
 
         {/* Quick Add Row */}
         <div className="quick-add-row">
