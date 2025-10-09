@@ -19,6 +19,7 @@ import ExplosionTest from './pages/ExplosionTest';
 import AnimationTest from './pages/AnimationTest';
 import AnimationTestNew from './pages/AnimationTestNew';
 import NoahWalkingTest from './pages/NoahWalkingTest';
+import TodoList from './pages/TodoList';
 import Header from './components/Header';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -79,6 +80,7 @@ function App() {
               <Route path="/animation-test" element={<AnimationTest />} />
               <Route path="/animation-test-new" element={<AnimationTestNew />} />
               <Route path="/noah-walking-test" element={<NoahWalkingTest />} />
+              <Route path="/todo" element={<TodoList />} />
             </Routes>
             <Footer />
             <Navbar />

@@ -3,11 +3,12 @@ import { useApp } from '../context/AppContext';
 import Calendar from '../components/Calendar';
 
 function Record() {
-  const { completedTasks, getTodaysTasks, getTasksByDate, fakeProductivity, addFakeProductivity, deleteFakeProductivity, deleteCompletedTask } = useApp();
+  const { completedTasks, getTodaysTasks, getTasksByDate, fakeProductivity, addFakeProductivity, deleteFakeProductivity, deleteCompletedTask, budgetGoals, setBudgetGoals } = useApp();
   const [selectedDate, setSelectedDate] = useState(null);
   const [fakeFilter, setFakeFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('daily');
   const [financeMonth, setFinanceMonth] = useState(new Date());
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [newFakeItem, setNewFakeItem] = useState({
     activity: '',
     category: 'cleaning',
@@ -20,7 +21,14 @@ function Record() {
   const getDailyTasks = () => completedTasks.filter(t => t.taskType === 'daily');
   const getHabitTasks = () => completedTasks.filter(t => t.taskType === 'habit');
   const getRecurringTasks = () => completedTasks.filter(t => t.taskType === 'recurring');
+  const getImpossibleTasks = () => completedTasks.filter(t => t.taskType === 'impossible');
   const getFinanceTasks = () => completedTasks.filter(t => t.taskType === 'finance');
+
+  // Get tasks for selected date by type
+  const getSelectedDateTasksByType = (taskType) => {
+    if (!selectedDate) return [];
+    return selectedDateTasks.filter(t => t.taskType === taskType);
+  };
 
   // Get finance tasks for selected month
   const getFinanceByMonth = () => {
@@ -56,69 +64,142 @@ function Record() {
     return item.category === fakeFilter;
   });
 
+  // Calculate actual income/spending for current period
+  const calculatePeriodTotals = () => {
+    const startDate = new Date(budgetGoals.startDate);
+
+    // Calculate period end based on goal period
+    let periodEnd = new Date(startDate);
+    if (budgetGoals.period === 'weekly') {
+      periodEnd.setDate(startDate.getDate() + 7);
+    } else if (budgetGoals.period === 'monthly') {
+      periodEnd.setMonth(startDate.getMonth() + 1);
+    } else if (budgetGoals.period === 'yearly') {
+      periodEnd.setFullYear(startDate.getFullYear() + 1);
+    }
+
+    // Filter completed finance tasks in current period
+    const periodTasks = completedTasks.filter(task => {
+      if (task.taskType !== 'finance') return false;
+      const taskDate = new Date(task.completedAt);
+      return taskDate >= startDate && taskDate <= periodEnd;
+    });
+
+    const totalIncome = periodTasks
+      .filter(t => t.amount > 0)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalSpending = Math.abs(periodTasks
+      .filter(t => t.amount < 0)
+      .reduce((sum, t) => sum + t.amount, 0));
+
+    return { totalIncome, totalSpending, periodEnd };
+  };
+
+  const { totalIncome, totalSpending, periodEnd } = calculatePeriodTotals();
+  const incomeProgress = budgetGoals.incomeGoal > 0 ? (totalIncome / budgetGoals.incomeGoal) * 100 : 0;
+  const spendingProgress = budgetGoals.spendingBudget > 0 ? (totalSpending / budgetGoals.spendingBudget) * 100 : 0;
+
+  // Determine cat state for budget
+  const getBudgetCatState = () => {
+    if (budgetGoals.incomeGoal === 0 && budgetGoals.spendingBudget === 0) {
+      return '/images/cat_finance1.png'; // No goals set
+    }
+
+    const incomeGood = budgetGoals.incomeGoal === 0 || totalIncome >= budgetGoals.incomeGoal;
+    const spendingGood = budgetGoals.spendingBudget === 0 || totalSpending <= budgetGoals.spendingBudget;
+
+    if (incomeGood && spendingGood) {
+      return '/images/cat_finance3.png'; // Goals met!
+    } else if (incomeProgress >= 50 || (spendingProgress <= 75 && budgetGoals.spendingBudget > 0)) {
+      return '/images/cat_finance2.png'; // On track
+    } else {
+      return '/images/cat_sad.png'; // Behind
+    }
+  };
+
   return (
     <div>
-      <div className="header">
-        <div className="header-content">
-          <div className="header-left">
-            <img
-              src="/images/logo_explodingemployee.png"
-              alt="Exploding Employee"
-              style={{ height: '120px', width: 'auto', objectFit: 'contain', animation: 'pulse 2s ease-in-out infinite' }}
-            />
-          </div>
-          <div className="energy-control">
-            <div className="energy-label">
-              <span id="energy-icon">📖</span>
-              <span>record book</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="current-date">
-        📅 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-      </div>
-
       <div className="content">
+        {/* Done List Title */}
+        <h2 style={{ fontSize: '24px', color: '#e91e63', marginBottom: '20px', fontWeight: 700 }}>
+          📝 Done List
+        </h2>
+
+        {/* Today's Wins - Full Width Compact */}
+        <div style={{
+          marginBottom: '20px',
+          background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)',
+          padding: '15px 20px',
+          borderRadius: '8px',
+          border: '2px solid #c5e1a5'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '16px', color: '#558b2f', margin: 0, fontWeight: 700 }}>Today's Wins 🎉</h3>
+            <span style={{ color: '#558b2f', fontWeight: 700, fontSize: '14px' }}>{todaysTasks.length} wins!!</span>
+          </div>
+
+          {todaysTasks.length === 0 ? (
+            <div style={{ fontSize: '13px', color: '#7cb342', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+              No completed tasks today yet!
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {todaysTasks.map(task => (
+                <div key={task.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: 'white',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  fontSize: '13px'
+                }}>
+                  <span style={{ color: '#4caf50', marginRight: '8px', fontWeight: 700 }}>✓</span>
+                  <span style={{ flex: 1, color: '#333' }}>{task.text}</span>
+                  <span style={{
+                    padding: '2px 8px',
+                    background: '#e3f2fd',
+                    color: '#1976d2',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    marginLeft: '10px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    +{task.expEarned} exp
+                  </span>
+                  <span style={{
+                    padding: '2px 8px',
+                    background: '#fff3e0',
+                    color: '#f57c00',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    marginLeft: '6px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    +{task.wonEarned} won
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Two-column layout: Calendar + Task Tabs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
           {/* Left: Calendar */}
           <div>
             <Calendar completedTasks={completedTasks} onDateSelect={handleDateSelect} />
-
-            {/* Today's Wins - Below Calendar */}
-            <div style={{ marginTop: '20px' }}>
-              <div className="section-header" style={{ marginBottom: '10px' }}>
-                <h2 style={{ fontSize: '18px' }}>Today's Wins 🎉</h2>
-                <span style={{ color: '#4caf50', fontWeight: 600 }}>{todaysTasks.length} wins!!</span>
-              </div>
-
-              <div className="done-list-section" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {todaysTasks.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-icon">🎯</div>
-                    <p>No completed tasks today yet!</p>
-                  </div>
-                ) : (
-                  todaysTasks.map(task => (
-                    <div key={task.id} className="done-item">
-                      <div className="done-header">
-                        <span className="done-icon">✓</span>
-                        <span className="done-text">{task.text}</span>
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#558b2f', marginTop: '3px' }}>
-                        +{task.expEarned} exp, +{task.wonEarned} won
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Right: Task Tabs (Browser-style) */}
           <div>
+            <h3 style={{ fontSize: '16px', color: '#666', marginBottom: '15px', fontWeight: 600 }}>
+              {selectedDate
+                ? `📅 ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                : '📅 All Time'}
+            </h3>
             <div className="browser-container" style={{ marginTop: 0 }}>
               {/* Browser Tabs */}
               <div className="browser-tabs">
@@ -127,7 +208,7 @@ function Record() {
                   onClick={() => setActiveTab('daily')}
                 >
                   <span className="tab-icon">📋</span>
-                  <span className="tab-title">Daily Tasks</span>
+                  <span className="tab-title">To-Do List</span>
                 </div>
                 <div
                   className={`browser-tab ${activeTab === 'habits' ? 'active' : ''}`}
@@ -143,23 +224,27 @@ function Record() {
                   <span className="tab-icon">🔄</span>
                   <span className="tab-title">Recurring</span>
                 </div>
+                <div
+                  className={`browser-tab ${activeTab === 'impossible' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('impossible')}
+                >
+                  <span className="tab-icon">🌟</span>
+                  <span className="tab-title">Impossible</span>
+                </div>
               </div>
 
               {/* Browser Content */}
               <div className="browser-content" style={{ maxHeight: '600px', overflowY: 'auto', padding: '20px' }}>
                 {activeTab === 'daily' && (
                   <div>
-                    <h3 style={{ fontSize: '16px', color: '#e91e63', marginBottom: '15px' }}>
-                      All Daily Tasks ({getDailyTasks().length})
-                    </h3>
-                    {getDailyTasks().length === 0 ? (
+                    {(selectedDate ? getSelectedDateTasksByType('daily') : getDailyTasks()).length === 0 ? (
                       <div className="empty-state">
                         <div className="empty-icon">📋</div>
-                        <p>No daily tasks completed yet!</p>
+                        <p>{selectedDate ? 'No to-do list tasks on this date!' : 'No to-do list tasks completed yet!'}</p>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {getDailyTasks().map(task => (
+                        {(selectedDate ? getSelectedDateTasksByType('daily') : getDailyTasks()).map(task => (
                           <div key={task.id} className="done-item">
                             <div className="done-header">
                               <span className="done-icon">✓</span>
@@ -177,17 +262,14 @@ function Record() {
 
                 {activeTab === 'habits' && (
                   <div>
-                    <h3 style={{ fontSize: '16px', color: '#e91e63', marginBottom: '15px' }}>
-                      All Habits ({getHabitTasks().length})
-                    </h3>
-                    {getHabitTasks().length === 0 ? (
+                    {(selectedDate ? getSelectedDateTasksByType('habit') : getHabitTasks()).length === 0 ? (
                       <div className="empty-state">
                         <div className="empty-icon">✅</div>
-                        <p>No habits logged yet!</p>
+                        <p>{selectedDate ? 'No habits logged on this date!' : 'No habits logged yet!'}</p>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {getHabitTasks().map(task => (
+                        {(selectedDate ? getSelectedDateTasksByType('habit') : getHabitTasks()).map(task => (
                           <div key={task.id} className="done-item">
                             <div className="done-header">
                               <span className="done-icon">✓</span>
@@ -205,17 +287,39 @@ function Record() {
 
                 {activeTab === 'recurring' && (
                   <div>
-                    <h3 style={{ fontSize: '16px', color: '#e91e63', marginBottom: '15px' }}>
-                      All Recurring Tasks ({getRecurringTasks().length})
-                    </h3>
-                    {getRecurringTasks().length === 0 ? (
+                    {(selectedDate ? getSelectedDateTasksByType('recurring') : getRecurringTasks()).length === 0 ? (
                       <div className="empty-state">
                         <div className="empty-icon">🔄</div>
-                        <p>No recurring tasks completed yet!</p>
+                        <p>{selectedDate ? 'No recurring tasks on this date!' : 'No recurring tasks completed yet!'}</p>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {getRecurringTasks().map(task => (
+                        {(selectedDate ? getSelectedDateTasksByType('recurring') : getRecurringTasks()).map(task => (
+                          <div key={task.id} className="done-item">
+                            <div className="done-header">
+                              <span className="done-icon">✓</span>
+                              <span className="done-text">{task.text}</span>
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                              {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'impossible' && (
+                  <div>
+                    {(selectedDate ? getSelectedDateTasksByType('impossible') : getImpossibleTasks()).length === 0 ? (
+                      <div className="empty-state">
+                        <div className="empty-icon">🌟</div>
+                        <p>{selectedDate ? 'No impossible tasks on this date!' : 'No impossible tasks completed yet!'}</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {(selectedDate ? getSelectedDateTasksByType('impossible') : getImpossibleTasks()).map(task => (
                           <div key={task.id} className="done-item">
                             <div className="done-header">
                               <span className="done-icon">✓</span>
@@ -358,6 +462,176 @@ function Record() {
               </span>
             </div>
           </div>
+
+          {/* Budget Goals Tracker */}
+          <div style={{
+            background: 'linear-gradient(135deg, #fff9e6 0%, #ffe6f0 100%)',
+            border: '3px solid #ffd93d',
+            borderRadius: '12px',
+            padding: '20px',
+            marginTop: '30px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <h3 style={{ fontSize: '18px', color: '#c2185b', margin: 0 }}>
+                💰 Budget Goals ({budgetGoals.period.charAt(0).toUpperCase() + budgetGoals.period.slice(1)})
+              </h3>
+              <button
+                onClick={() => setShowBudgetModal(!showBudgetModal)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#c2185b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 600
+                }}
+              >
+                ⚙️ {showBudgetModal ? 'Close' : 'Set Goals'}
+              </button>
+            </div>
+
+            {/* Budget Settings Modal */}
+            {showBudgetModal && (
+              <div style={{
+                background: 'white',
+                padding: '15px',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                border: '2px solid #e0e0e0'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Period:</label>
+                    <select
+                      value={budgetGoals.period}
+                      onChange={(e) => setBudgetGoals({ ...budgetGoals, period: e.target.value, startDate: new Date().toISOString() })}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '2px solid #e0e0e0',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Income Goal (₩):</label>
+                    <input
+                      type="number"
+                      value={budgetGoals.incomeGoal}
+                      onChange={(e) => setBudgetGoals({ ...budgetGoals, incomeGoal: Number(e.target.value) })}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '2px solid #e0e0e0',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                      placeholder="e.g., 10000"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Spending Budget (₩):</label>
+                  <input
+                    type="number"
+                    value={budgetGoals.spendingBudget}
+                    onChange={(e) => setBudgetGoals({ ...budgetGoals, spendingBudget: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '2px solid #e0e0e0',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    placeholder="e.g., 5000"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Progress Display */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+              {/* Income Progress */}
+              <div style={{ background: 'white', padding: '15px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>💵 Income</div>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#4caf50', marginBottom: '8px' }}>
+                  {totalIncome.toLocaleString()} ₩
+                </div>
+                {budgetGoals.incomeGoal > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', color: '#999', marginBottom: '5px' }}>
+                      Goal: {budgetGoals.incomeGoal.toLocaleString()} ₩
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${Math.min(incomeProgress, 100)}%`,
+                        height: '100%',
+                        background: incomeProgress >= 100 ? '#4caf50' : '#ffa726',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
+                      {incomeProgress.toFixed(0)}%
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Spending Progress */}
+              <div style={{ background: 'white', padding: '15px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>💸 Spending</div>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: '#ff5252', marginBottom: '8px' }}>
+                  {totalSpending.toLocaleString()} ₩
+                </div>
+                {budgetGoals.spendingBudget > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', color: '#999', marginBottom: '5px' }}>
+                      Budget: {budgetGoals.spendingBudget.toLocaleString()} ₩
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${Math.min(spendingProgress, 100)}%`,
+                        height: '100%',
+                        background: spendingProgress > 100 ? '#ff5252' : spendingProgress > 75 ? '#ffa726' : '#4caf50',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
+                      {spendingProgress.toFixed(0)}%
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Cat State */}
+              <div style={{
+                background: 'white',
+                padding: '15px',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <img
+                  src={getBudgetCatState()}
+                  alt="Cat status"
+                  style={{ width: '80px', height: '80px', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ fontSize: '11px', color: '#999', textAlign: 'center' }}>
+              Period ends: {periodEnd.toLocaleDateString()}
+            </div>
+          </div>
         </div>
 
         {/* Divider */}
@@ -418,27 +692,55 @@ function Record() {
                   <p>{fakeProductivity.length === 0 ? 'No fake productivity yet!' : 'No items match this filter.'}</p>
                 </div>
               ) : (
-                filteredFakeItems.map(item => (
-                  <div key={item.id} className="fake-prod-item">
-                    <div className="fake-prod-text">{item.activity}</div>
-                    <span className={`fake-prod-category ${item.category}`}>
-                      {item.category === 'cleaning' && '🧹 Cleaning'}
-                      {item.category === 'work' && '💼 Actual Work'}
-                      {item.category === 'fake' && '✨ Fake Productivity'}
-                    </span>
-                    <div className="fake-prod-date">
-                      {new Date(item.date).toLocaleDateString()}
+                <>
+                  {filteredFakeItems.map(item => (
+                    <div key={item.id} className="fake-prod-item">
+                      <div className="fake-prod-text">{item.activity}</div>
+                      <span className={`fake-prod-category ${item.category}`}>
+                        {item.category === 'cleaning' && '🧹 Cleaning'}
+                        {item.category === 'work' && '💼 Actual Work'}
+                        {item.category === 'fake' && '✨ Fake Productivity'}
+                      </span>
+                      <div className="fake-prod-date">
+                        {new Date(item.date).toLocaleDateString()}
+                      </div>
+                      <div className="col-fake-actions">
+                        <button
+                          className="delete-btn task-btn"
+                          onClick={() => deleteFakeProductivity(item.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                    <div className="col-fake-actions">
-                      <button
-                        className="delete-btn task-btn"
-                        onClick={() => deleteFakeProductivity(item.id)}
-                      >
-                        ✕
-                      </button>
-                    </div>
+                  ))}
+
+                  {/* Cat at bottom when items exist */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '20px',
+                    borderTop: '2px dashed #e0e0e0'
+                  }}>
+                    <img
+                      src='/images/cat_productivity.png'
+                      alt="Cat"
+                      style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                    />
+                    {fakeProductivity.length >= 15 && (
+                      <div style={{
+                        fontSize: '13px',
+                        color: '#999',
+                        fontStyle: 'italic',
+                        textAlign: 'center'
+                      }}>
+                        🎉 {fakeProductivity.length} fake productivity activities logged!
+                      </div>
+                    )}
                   </div>
-                ))
+                </>
               )}
             </div>
 

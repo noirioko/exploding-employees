@@ -50,6 +50,14 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   // Fake productivity items
   const [fakeProductivity, setFakeProductivity] = useState(() => loadFromStorage('fakeProductivity', []));
 
+  // Budget goals tracking
+  const [budgetGoals, setBudgetGoals] = useState(() => loadFromStorage('budgetGoals', {
+    period: 'monthly', // 'weekly', 'monthly', 'yearly'
+    incomeGoal: 0,
+    spendingBudget: 0,
+    startDate: new Date().toISOString()
+  }));
+
   // Card collection system (100 canon office cards from task drops)
   const [collectedCards, setCollectedCards] = useState(() => loadFromStorage('collectedCards', []));
   const [lastCardDrop, setLastCardDrop] = useState(null);
@@ -116,6 +124,10 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   useEffect(() => {
     localStorage.setItem('fakeProductivity', JSON.stringify(fakeProductivity));
   }, [fakeProductivity]);
+
+  useEffect(() => {
+    localStorage.setItem('budgetGoals', JSON.stringify(budgetGoals));
+  }, [budgetGoals]);
 
   useEffect(() => {
     localStorage.setItem('collectedCards', JSON.stringify(collectedCards));
@@ -934,6 +946,45 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     return true;
   };
 
+  // Reset all data
+  const resetAllData = () => {
+    // Clear localStorage
+    localStorage.clear();
+
+    // Reset all state to defaults
+    setTasks([]);
+    setCompletedTasks([]);
+    setAccumulatedWon(0);
+    setYuCash(0);
+    setNoahCreditCard(0);
+    setWon(0);
+    setTotalExp(0);
+    setEmployeeMorale({
+      yuwon: { mood: 'happy', overworked: false, bored: false, lastTaskCompletedAt: null, lastRestAt: null },
+      jaehyun: { mood: 'happy', overworked: false, bored: false, lastTaskCompletedAt: null, lastRestAt: null },
+      minkyu: { mood: 'happy', overworked: false, bored: false, lastTaskCompletedAt: null, lastRestAt: null },
+      noah: { mood: 'happy', overworked: false, bored: false, lastTaskCompletedAt: null, lastRestAt: null },
+    });
+    setHydrationLog([]);
+    setRestLog([]);
+    setFakeProductivity([]);
+    setCollectedCards([]);
+    setLastCardDrop(null);
+    setGachaHistory([]);
+    setUnlockedAUs([]);
+    setAuProgress({});
+    setIngredients({});
+    setCookedDishes({});
+    setDiscoveredRecipes([]);
+    setFriendshipPoints({
+      yuwon: 0,
+      noah: 0,
+      jaehyun: 0,
+      minkyu: 0
+    });
+    setLastDate(new Date().toDateString());
+  };
+
   const value = {
     tasks,
     completedTasks,
@@ -992,6 +1043,9 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     friendshipPoints,
     addFriendshipPoints,
     consumeDish,
+    resetAllData,
+    budgetGoals,
+    setBudgetGoals,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
