@@ -464,46 +464,95 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     let rank, rankColor;
 
     if (isNoah) {
-      // Noah: Check if recurring tasks were missed
-      // For each day in last 7 days, check if there were due recurring tasks and if they were completed
-      let missedDays = 0;
+      // Noah: Only count days when recurring tasks were ACTUALLY due
+      // This is more forgiving - doesn't penalize for days with no due tasks
+      let dueDaysWithCompletions = 0;
+      let totalDueDays = 0;
+
+      // Get ALL recurring tasks (both pending and completed) to know what's due
+      const allRecurringTasks = [...employeeTasks, ...employeeCompletedTasks];
+
+      console.log(`🔍 Noah Debug - Total recurring tasks: ${allRecurringTasks.length}`);
 
       for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+
+        // Check if ANY recurring task was due on this day
         const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
         const dayOfMonth = date.getDate();
 
-        // Check if any recurring tasks were due on this day
-        const dueTasks = tasks.filter(t => {
-          if (t.taskType !== 'recurring') return false;
+        const tasksDueOnDay = allRecurringTasks.filter(task => {
+          if (!task.recurrence) return false; // Daily tasks without recurrence = always due
 
-          switch(t.recurrence) {
+          switch(task.recurrence) {
             case 'daily':
-              return true;
+              return true; // Due every day
             case 'weekly':
-              return t.recurDay === dayOfWeek;
+              return task.recurDay === dayOfWeek;
             case 'monthly':
-              return Number(t.recurDate) === dayOfMonth;
+              return Number(task.recurDate) === dayOfMonth;
             case 'bi-monthly':
-              return t.recurDates && t.recurDates.some(d => Number(d) === dayOfMonth);
+              return task.recurDates && task.recurDates.some(d => Number(d) === dayOfMonth);
             default:
               return false;
           }
         });
 
-        // If tasks were due but none completed, count as missed
-        if (dueTasks.length > 0 && last7Days[i] === 0) {
-          missedDays++;
+        // If ANY task was due on this day, count it as a "due day"
+        if (tasksDueOnDay.length > 0) {
+          totalDueDays++;
+
+          // Check if any were actually completed
+          const completedOnDay = employeeCompletedTasks.filter(task => {
+            const taskDate = new Date(task.completedAt);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate.getTime() === date.getTime();
+          });
+
+          if (completedOnDay.length > 0) {
+            dueDaysWithCompletions++;
+            console.log(`✅ Day ${i} (${date.toDateString()}): ${completedOnDay.length}/${tasksDueOnDay.length} tasks completed`);
+          } else {
+            console.log(`❌ Day ${i} (${date.toDateString()}): 0/${tasksDueOnDay.length} tasks completed (MISSED!)`);
+          }
+        } else {
+          console.log(`⏸️ Day ${i} (${date.toDateString()}): No tasks due (doesn't count)`);
         }
       }
 
-      // Noah's rank based on missed days (more forgiving - only penalize on misses)
-      if (missedDays === 0) { rank = 'S'; rankColor = '#f39c12'; }
-      else if (missedDays <= 1) { rank = 'A'; rankColor = '#3498db'; }
-      else if (missedDays <= 2) { rank = 'B'; rankColor = '#2ecc71'; }
-      else if (missedDays <= 4) { rank = 'C'; rankColor = '#95a5a6'; }
-      else { rank = 'F'; rankColor = '#e74c3c'; }
+      console.log(`📊 Noah - Due days: ${totalDueDays}, Completed: ${dueDaysWithCompletions}`);
+
+      // Calculate rank based on completion rate of DUE days only
+      const completionRate = totalDueDays > 0 ? dueDaysWithCompletions / totalDueDays : 1.0;
+
+      if (totalDueDays === 0) {
+        // No recurring tasks exist or none were due - give benefit of doubt
+        rank = 'B';
+        rankColor = '#2ecc71';
+        console.log(`🏆 Noah Rank: ${rank} (No tasks due in 7 days - B rank by default)`);
+      } else if (completionRate === 1.0) {
+        rank = 'S';
+        rankColor = '#f39c12';
+        console.log(`🏆 Noah Rank: ${rank} (Perfect ${dueDaysWithCompletions}/${totalDueDays}!)`);
+      } else if (completionRate >= 0.7) {
+        rank = 'A';
+        rankColor = '#3498db';
+        console.log(`🏆 Noah Rank: ${rank} (${dueDaysWithCompletions}/${totalDueDays} = ${(completionRate*100).toFixed(0)}%)`);
+      } else if (completionRate >= 0.5) {
+        rank = 'B';
+        rankColor = '#2ecc71';
+        console.log(`🏆 Noah Rank: ${rank} (${dueDaysWithCompletions}/${totalDueDays} = ${(completionRate*100).toFixed(0)}%)`);
+      } else if (completionRate >= 0.3) {
+        rank = 'C';
+        rankColor = '#95a5a6';
+        console.log(`🏆 Noah Rank: ${rank} (${dueDaysWithCompletions}/${totalDueDays} = ${(completionRate*100).toFixed(0)}%)`);
+      } else {
+        rank = 'F';
+        rankColor = '#e74c3c';
+        console.log(`🏆 Noah Rank: ${rank} (${dueDaysWithCompletions}/${totalDueDays} = ${(completionRate*100).toFixed(0)}%)`);
+      }
     } else if (isFinance) {
       // Finance: More forgiving thresholds
       if (daysWorked >= 5) { rank = 'S'; rankColor = '#f39c12'; }

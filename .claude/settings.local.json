@@ -23,7 +23,9 @@
       "Bash(git -C \"C:\\Users\\livia\\OneDrive\\Desktop\\exploding-employees\\exploding-employees\\exploding-employees-react\" show HEAD:src/pages/Room.jsx)",
       "Bash(git fsck:*)",
       "Bash(findstr:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

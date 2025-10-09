@@ -795,6 +795,39 @@ function Company() {
                     }} />
                   </div>
                 </div>
+
+                {/* Simple Score Breakdown */}
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px',
+                  background: '#f9f9f9',
+                  borderRadius: '8px',
+                  fontSize: '11px'
+                }}>
+                  <div style={{
+                    fontWeight: '700',
+                    color: '#666',
+                    marginBottom: '6px',
+                    textAlign: 'center',
+                    fontSize: '12px'
+                  }}>
+                    📊 Last 7 Days
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#999' }}>Days Worked:</span>
+                    <span style={{ fontWeight: '700', color: '#4caf50' }}>{morale.daysWorked}/7</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#999' }}>Today Energy:</span>
+                    <span style={{ fontWeight: '700', color: morale.energyPoints >= 9 ? '#e74c3c' : morale.energyPoints >= 6 ? '#ff9800' : '#4caf50' }}>
+                      {morale.energyPoints}/10
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#999' }}>Today Tasks:</span>
+                    <span style={{ fontWeight: '700', color: '#2196f3' }}>{morale.doneToday}</span>
+                  </div>
+                </div>
               </div>
             </div>
           );

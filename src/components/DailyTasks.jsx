@@ -81,32 +81,14 @@ function DailyTasks({ energyLevel }) {
     setEditingTask(null);
   };
 
-  // Sort tasks
-  const getSortedTasks = () => {
-    let sorted = [...dailyTasks];
+  // Check if task is urgent (manually marked OR deadline within 2 days)
+  const isUrgent = (task) => {
+    // Check manual priority flag first
+    if (task.priority) return true;
 
-    if (sortBy === 'dueDate') {
-      sorted.sort((a, b) => {
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline) - new Date(b.deadline);
-      });
-    } else if (sortBy === 'energy') {
-      const energyOrder = { low: 1, med: 2, high: 3 };
-      sorted.sort((a, b) => energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med']);
-    } else if (sortBy === 'category') {
-      sorted.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
-    }
-
-    return sorted;
-  };
-
-  const sortedTasks = getSortedTasks();
-
-  // Check if deadline is urgent (within 2 days)
-  const isUrgent = (deadline) => {
-    if (!deadline) return false;
-    const deadlineDate = new Date(deadline);
+    // Check deadline proximity
+    if (!task.deadline) return false;
+    const deadlineDate = new Date(task.deadline);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     deadlineDate.setHours(0, 0, 0, 0);
@@ -114,6 +96,61 @@ function DailyTasks({ energyLevel }) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 2; // Today, tomorrow, or day after
   };
+
+  // Sort tasks
+  const getSortedTasks = () => {
+    let sorted = [...dailyTasks];
+
+    // Always sort urgent tasks to the top first, regardless of sort option
+    sorted.sort((a, b) => {
+      const aUrgent = isUrgent(a);
+      const bUrgent = isUrgent(b);
+      if (aUrgent && !bUrgent) return -1;
+      if (!aUrgent && bUrgent) return 1;
+      return 0; // Keep relative order if both urgent or both not urgent
+    });
+
+    // Then apply secondary sort if not in default mode
+    if (sortBy === 'dueDate') {
+      sorted.sort((a, b) => {
+        // Keep urgent at top
+        const aUrgent = isUrgent(a);
+        const bUrgent = isUrgent(b);
+        if (aUrgent && !bUrgent) return -1;
+        if (!aUrgent && bUrgent) return 1;
+
+        // Sort by deadline
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    } else if (sortBy === 'energy') {
+      const energyOrder = { low: 1, med: 2, high: 3 };
+      sorted.sort((a, b) => {
+        // Keep urgent at top
+        const aUrgent = isUrgent(a);
+        const bUrgent = isUrgent(b);
+        if (aUrgent && !bUrgent) return -1;
+        if (!aUrgent && bUrgent) return 1;
+
+        return energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med'];
+      });
+    } else if (sortBy === 'category') {
+      sorted.sort((a, b) => {
+        // Keep urgent at top
+        const aUrgent = isUrgent(a);
+        const bUrgent = isUrgent(b);
+        if (aUrgent && !bUrgent) return -1;
+        if (!aUrgent && bUrgent) return 1;
+
+        return (a.category || '').localeCompare(b.category || '');
+      });
+    }
+
+    return sorted;
+  };
+
+  const sortedTasks = getSortedTasks();
 
   return (
     <div className="task-section section-todolist" style={{ marginBottom: '30px' }}>
@@ -242,7 +279,7 @@ function DailyTasks({ energyLevel }) {
               {sortedTasks.map(task => (
               <div key={task.id} className="task-row">
                 <div className="col-task">
-                  {isUrgent(task.deadline) && <span className="priority-badge">URGENT</span>}
+                  {isUrgent(task) && <span className="priority-badge">URGENT</span>}
                   <span className="task-text">{task.text}</span>
                 </div>
                 <div className="col-category">
