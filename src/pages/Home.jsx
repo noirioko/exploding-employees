@@ -129,11 +129,28 @@ function Home() {
           marginBottom: '20px',
           borderRadius: '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <span style={{ fontSize: '32px' }}>{getEnergyIcon()}</span>
-            <span style={{ fontSize: '18px', fontWeight: '600', color: '#e91e63' }}>
-              My Energy Today: <span style={{ fontSize: '24px' }}>{energyLevel}/10</span>
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '32px' }}>{getEnergyIcon()}</span>
+              <span style={{ fontSize: '18px', fontWeight: '600', color: '#e91e63' }}>
+                My Energy Today: <span style={{ fontSize: '24px' }}>{energyLevel}/10</span>
+              </span>
+            </div>
+            <div style={{
+              background: '#fff',
+              border: '2px solid #ffc1e3',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '11px',
+              color: '#e91e63',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span style={{ fontSize: '14px' }}>🌙</span>
+              <span>Auto-resets at midnight</span>
+            </div>
           </div>
           <input
             type="range"
