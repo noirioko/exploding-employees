@@ -4,9 +4,17 @@ import InfoPopup from '../components/InfoPopup';
 import './Company.css';
 
 function Company() {
-  const { completedTasks, won, totalExp, accumulatedWon, yuCash, noahCreditCard, givePaycheck, getMoraleStatus, getCompanyRank, seedTestRankData } = useApp();
+  const { completedTasks, won, totalExp, accumulatedWon, yuCash, noahCreditCard, givePaycheck, getMoraleStatus, getCompanyRank, seedTestRankData, minkyuMode } = useApp();
   const [activeTab, setActiveTab] = useState('achievement');
   const [selectedCouple, setSelectedCouple] = useState('noah-yuwon');
+
+  // Mode labels for display
+  const modeLabels = {
+    'normal': '🏠 Normal',
+    'no-buy': '🚫 No-Buy Challenge',
+    'jobless': '💼 Jobless/Break',
+    'saving': '💰 Saving Goal'
+  };
 
   const renderAchievement = () => {
 
@@ -647,6 +655,24 @@ function Company() {
                 alt={employee}
                 style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '50%', marginBottom: '10px' }}
               />
+
+              {/* Minkyu Life Mode Badge */}
+              {employee === 'minkyu' && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #00897b 0%, #00695c 100%)',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  display: 'inline-block',
+                  boxShadow: '0 2px 6px rgba(0, 137, 123, 0.4)'
+                }}>
+                  {modeLabels[minkyuMode] || '🏠 Normal'}
+                </div>
+              )}
+
               <h4 style={{ fontSize: '16px', color: '#333', marginBottom: '8px', textTransform: 'capitalize', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 {employee}
                 <InfoPopup

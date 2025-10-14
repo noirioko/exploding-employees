@@ -58,6 +58,13 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     startDate: new Date().toISOString()
   }));
 
+  // Minkyu Life Mode - affects how finance tracking is evaluated
+  // 'normal' = track both income & spending (default)
+  // 'no-buy' = focus on avoiding spending
+  // 'jobless' = track only spending (no income expected)
+  // 'saving' = reward income, penalize spending
+  const [minkyuMode, setMinkyuMode] = useState(() => loadFromStorage('minkyuMode', 'normal'));
+
   // Card collection system (100 canon office cards from task drops)
   const [collectedCards, setCollectedCards] = useState(() => loadFromStorage('collectedCards', []));
   const [lastCardDrop, setLastCardDrop] = useState(null);
@@ -128,6 +135,10 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   useEffect(() => {
     localStorage.setItem('budgetGoals', JSON.stringify(budgetGoals));
   }, [budgetGoals]);
+
+  useEffect(() => {
+    localStorage.setItem('minkyuMode', JSON.stringify(minkyuMode));
+  }, [minkyuMode]);
 
   useEffect(() => {
     localStorage.setItem('collectedCards', JSON.stringify(collectedCards));
@@ -391,7 +402,7 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   };
 
   // Get employee morale status
-  const getMoraleStatus = (employee) => {
+  const getMoraleStatus = (employee, currentMinkyuMode = minkyuMode) => {
     const employeeTasks = tasks.filter(t => {
       if (employee === 'yuwon') return t.taskType === 'daily';
       if (employee === 'jaehyun') return t.taskType === 'habit';
@@ -554,12 +565,43 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
         console.log(`🏆 Noah Rank: ${rank} (${dueDaysWithCompletions}/${totalDueDays} = ${(completionRate*100).toFixed(0)}%)`);
       }
     } else if (isFinance) {
-      // Finance: More forgiving thresholds
-      if (daysWorked >= 5) { rank = 'S'; rankColor = '#f39c12'; }
-      else if (daysWorked >= 3) { rank = 'A'; rankColor = '#3498db'; }
-      else if (daysWorked >= 2) { rank = 'B'; rankColor = '#2ecc71'; }
-      else if (daysWorked >= 1) { rank = 'C'; rankColor = '#95a5a6'; }
-      else { rank = 'F'; rankColor = '#e74c3c'; }
+      // Finance (Minkyu): Ranking depends on Life Mode
+      console.log(`💰 Minkyu Mode: ${currentMinkyuMode}`);
+
+      if (currentMinkyuMode === 'normal') {
+        // Normal mode: Track both income & spending (current behavior)
+        if (daysWorked >= 5) { rank = 'S'; rankColor = '#f39c12'; }
+        else if (daysWorked >= 3) { rank = 'A'; rankColor = '#3498db'; }
+        else if (daysWorked >= 2) { rank = 'B'; rankColor = '#2ecc71'; }
+        else if (daysWorked >= 1) { rank = 'C'; rankColor = '#95a5a6'; }
+        else { rank = 'F'; rankColor = '#e74c3c'; }
+      } else if (currentMinkyuMode === 'no-buy') {
+        // No-Buy Challenge: Count days, but give warnings if spending logged
+        // Days with ANY finance log = worked (even spending)
+        // But we'll show a special indicator if there's spending
+        if (daysWorked >= 5) { rank = 'S'; rankColor = '#f39c12'; }
+        else if (daysWorked >= 3) { rank = 'A'; rankColor = '#3498db'; }
+        else if (daysWorked >= 2) { rank = 'B'; rankColor = '#2ecc71'; }
+        else if (daysWorked >= 1) { rank = 'C'; rankColor = '#95a5a6'; }
+        else { rank = 'F'; rankColor = '#e74c3c'; }
+      } else if (currentMinkyuMode === 'jobless') {
+        // Jobless/Break: Only spending logs matter (tracking expenses)
+        // More forgiving - any tracking is good
+        if (daysWorked >= 3) { rank = 'S'; rankColor = '#f39c12'; }
+        else if (daysWorked >= 2) { rank = 'A'; rankColor = '#3498db'; }
+        else if (daysWorked >= 1) { rank = 'B'; rankColor = '#2ecc71'; }
+        else { rank = 'C'; rankColor = '#95a5a6'; } // Don't give F easily
+      } else if (currentMinkyuMode === 'saving') {
+        // Saving Mode: Days with income OR no spending = good
+        // Slightly stricter
+        if (daysWorked >= 6) { rank = 'S'; rankColor = '#f39c12'; }
+        else if (daysWorked >= 4) { rank = 'A'; rankColor = '#3498db'; }
+        else if (daysWorked >= 2) { rank = 'B'; rankColor = '#2ecc71'; }
+        else if (daysWorked >= 1) { rank = 'C'; rankColor = '#95a5a6'; }
+        else { rank = 'F'; rankColor = '#e74c3c'; }
+      }
+
+      console.log(`💰 Minkyu Rank: ${rank} (${daysWorked}/7 days worked in ${currentMinkyuMode} mode)`);
     } else {
       // Others: Standard thresholds
       if (daysWorked === 7) { rank = 'S'; rankColor = '#f39c12'; }
@@ -1032,6 +1074,13 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
       minkyu: 0
     });
     setLastDate(new Date().toDateString());
+    setBudgetGoals({
+      period: 'monthly',
+      incomeGoal: 0,
+      spendingBudget: 0,
+      startDate: new Date().toISOString()
+    });
+    setMinkyuMode('normal');
   };
 
   const value = {
@@ -1095,6 +1144,8 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     resetAllData,
     budgetGoals,
     setBudgetGoals,
+    minkyuMode,
+    setMinkyuMode,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

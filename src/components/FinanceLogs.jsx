@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import InfoPopup from './InfoPopup';
 
 function FinanceLogs({ energyLevel }) {
-  const { getTasksByType, addTask, deleteTask, completeTask } = useApp();
+  const { getTasksByType, addTask, deleteTask, completeTask, minkyuMode, setMinkyuMode } = useApp();
 
   // Finance logs don't typically need energy filtering, but keep for consistency
   const financeLogs = getTasksByType('finance');
@@ -78,6 +78,15 @@ function FinanceLogs({ energyLevel }) {
     return found ? found.label : category;
   };
 
+  const modes = [
+    { value: 'normal', label: '🏠 Normal', desc: 'Track both income & spending' },
+    { value: 'no-buy', label: '🚫 No-Buy Challenge', desc: 'Avoid spending this month' },
+    { value: 'jobless', label: '💼 Jobless/Break', desc: 'Track expenses only (no income expected)' },
+    { value: 'saving', label: '💰 Saving Goal', desc: 'Focus on income & minimizing spending' }
+  ];
+
+  const currentMode = modes.find(m => m.value === minkyuMode) || modes[0];
+
   return (
     <div className="task-section section-finance" style={{ marginBottom: '30px' }}>
 
@@ -100,23 +109,56 @@ function FinanceLogs({ energyLevel }) {
         }}>
           <img src="/images/Minkyu_1.png" alt="Minkyu" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
         </div>
-        <div style={{ padding: '12px 20px', background: '#e0f2f1' }}>
-          <h3 style={{ fontSize: '18px', color: '#00897b', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            💰 Finance Logs (Draft)
-            <InfoPopup
-              title="📝 Finance Draft System"
-              content={
-                <>
-                  <p style={{ marginBottom: '8px' }}><strong>How it works:</strong></p>
-                  <p style={{ marginBottom: '8px' }}>• Add expenses/income here as <strong>drafts</strong></p>
-                  <p style={{ marginBottom: '8px' }}>• Drafts are <strong>NOT permanent</strong> - edit/delete anytime</p>
-                  <p style={{ marginBottom: '8px' }}>• Click "📋 Record" to move to Record tab</p>
-                  <p style={{ marginBottom: '0' }}>• Recording gives Minkyu <strong>EXP points!</strong> 💪</p>
-                </>
-              }
-            />
-          </h3>
-          <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Track expenses & income, then record them!</p>
+        <div style={{ padding: '12px 20px', background: '#e0f2f1', display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div>
+            <h3 style={{ fontSize: '18px', color: '#00897b', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              💰 Finance Logs (Draft)
+              <InfoPopup
+                title="📝 Finance Draft System"
+                content={
+                  <>
+                    <p style={{ marginBottom: '8px' }}><strong>How it works:</strong></p>
+                    <p style={{ marginBottom: '8px' }}>• Add expenses/income here as <strong>drafts</strong></p>
+                    <p style={{ marginBottom: '8px' }}>• Drafts are <strong>NOT permanent</strong> - edit/delete anytime</p>
+                    <p style={{ marginBottom: '8px' }}>• Click "📋 Record" to move to Record tab</p>
+                    <p style={{ marginBottom: '0' }}>• Recording gives Minkyu <strong>EXP points!</strong> 💪</p>
+                  </>
+                }
+              />
+            </h3>
+            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Track expenses & income, then record them!</p>
+          </div>
+
+          {/* Minkyu Life Mode Selector - Inline */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#00695c', fontWeight: '600' }}>Mode:</span>
+            {modes.map(mode => (
+              <button
+                key={mode.value}
+                onClick={() => setMinkyuMode(mode.value)}
+                title={mode.desc}
+                style={{
+                  padding: '6px 12px',
+                  background: minkyuMode === mode.value
+                    ? 'linear-gradient(135deg, #00897b 0%, #00695c 100%)'
+                    : 'white',
+                  color: minkyuMode === mode.value ? 'white' : '#00897b',
+                  border: `2px solid ${minkyuMode === mode.value ? '#00695c' : '#00897b'}`,
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: minkyuMode === mode.value
+                    ? '0 2px 8px rgba(0, 137, 123, 0.4)'
+                    : 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
