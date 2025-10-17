@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import InfoPopup from '../components/InfoPopup';
+import YuwonDesktop from '../components/YuwonDesktop';
 import './Company.css';
 
 function Company() {
   const { completedTasks, won, totalExp, accumulatedWon, yuCash, noahCreditCard, givePaycheck, getMoraleStatus, getCompanyRank, seedTestRankData, minkyuMode } = useApp();
   const [activeTab, setActiveTab] = useState('achievement');
   const [selectedCouple, setSelectedCouple] = useState('noah-yuwon');
+  const [showDesktop, setShowDesktop] = useState(false);
 
   // Mode labels for display
   const modeLabels = {
@@ -1201,14 +1203,18 @@ function Company() {
                 border: '1px solid #99ffaa',
                 cursor: 'not-allowed'
               }} title="Maximize" />
-              <div style={{
-                width: '14px',
-                height: '14px',
-                borderRadius: '50%',
-                background: '#ffffba',
-                border: '1px solid #ffff99',
-                cursor: 'not-allowed'
-              }} title="Minimize" />
+              <div
+                onClick={() => setShowDesktop(true)}
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#ffffba',
+                  border: '1px solid #ffff99',
+                  cursor: 'pointer'
+                }}
+                title="Minimize (Yuwon's Desktop)"
+              />
               <div style={{
                 width: '14px',
                 height: '14px',
@@ -1355,10 +1361,16 @@ function Company() {
 
           {/* Tab content */}
           <div style={{ padding: '20px', background: 'white' }}>
-            {activeTab === 'achievement' && renderAchievement()}
-            {activeTab === 'promotion' && renderPromotion()}
-            {activeTab === 'moral' && renderMoral()}
-            {activeTab === 'finance' && renderFinance()}
+            {showDesktop ? (
+              <YuwonDesktop onClose={() => setShowDesktop(false)} />
+            ) : (
+              <>
+                {activeTab === 'achievement' && renderAchievement()}
+                {activeTab === 'promotion' && renderPromotion()}
+                {activeTab === 'moral' && renderMoral()}
+                {activeTab === 'finance' && renderFinance()}
+              </>
+            )}
           </div>
         </div>
       </div>
