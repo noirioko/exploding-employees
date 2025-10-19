@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Reusable Info Popup Component
@@ -6,10 +7,23 @@ import { useState } from 'react';
  */
 function InfoPopup({ title, content }) {
   const [showPopup, setShowPopup] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (showPopup && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 10,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  }, [showPopup]);
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <button
+        ref={buttonRef}
         onClick={() => setShowPopup(!showPopup)}
         className="info-popup-button"
         style={{
@@ -62,7 +76,7 @@ function InfoPopup({ title, content }) {
         }}>i</span>
       </button>
 
-      {showPopup && (
+      {showPopup && createPortal(
         <>
           {/* Backdrop */}
           <div
@@ -72,7 +86,7 @@ function InfoPopup({ title, content }) {
               left: 0,
               right: 0,
               bottom: 0,
-              zIndex: 998,
+              zIndex: 9998,
             }}
             onClick={() => setShowPopup(false)}
           />
@@ -80,9 +94,9 @@ function InfoPopup({ title, content }) {
           {/* Popup */}
           <div
             style={{
-              position: 'absolute',
-              top: '30px',
-              left: '50%',
+              position: 'fixed',
+              top: `${position.top}px`,
+              left: `${position.left}px`,
               transform: 'translateX(-50%)',
               background: 'white',
               border: '3px solid #e91e63',
@@ -91,7 +105,7 @@ function InfoPopup({ title, content }) {
               minWidth: '250px',
               maxWidth: '350px',
               boxShadow: '0 8px 24px rgba(233, 30, 99, 0.2)',
-              zIndex: 999,
+              zIndex: 9999,
               animation: 'popupSlideIn 0.2s ease-out',
             }}
           >
@@ -141,7 +155,8 @@ function InfoPopup({ title, content }) {
               }
             }
           `}</style>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

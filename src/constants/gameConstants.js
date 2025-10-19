@@ -5,6 +5,13 @@ export const ENERGY_REWARDS = {
   high: { exp: 3, won: 50 }
 };
 
+// Impossible task rewards (higher rewards, costs 5 energy from ALL employees)
+export const IMPOSSIBLE_TASK_REWARDS = {
+  low: { exp: 3, won: 75, energyCost: 5 },
+  med: { exp: 5, won: 125, energyCost: 5 },
+  high: { exp: 8, won: 200, energyCost: 5 }
+};
+
 // Card drop rate
 export const CARD_DROP_CHANCE = 0.1; // 10% chance
 
