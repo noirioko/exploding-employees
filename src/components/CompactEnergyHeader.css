@@ -1,0 +1,222 @@
+.compact-energy-header {
+  background: linear-gradient(135deg, #fff9f0 0%, #ffe8f5 100%);
+  border: 2px solid #ffc1e3;
+  border-radius: 12px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 0 auto 20px auto;
+  max-width: 1200px;
+  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.1);
+}
+
+.energy-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.energy-icon {
+  font-size: 20px;
+}
+
+.energy-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.energy-slider-compact {
+  width: 150px;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  background: #e0e0e0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.energy-slider-compact::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--slider-color, #e91e63);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.energy-slider-compact::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.energy-slider-compact::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--slider-color, #e91e63);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.energy-slider-compact::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.energy-value {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 45px;
+}
+
+.divider {
+  color: #d0d0d0;
+  font-weight: 300;
+}
+
+.goal-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+}
+
+.goal-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e91e63;
+}
+
+.reset-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #999;
+}
+
+.reset-icon {
+  font-size: 14px;
+}
+
+.reset-label {
+  font-weight: 500;
+}
+
+/* Milestone Progress Section */
+.milestone-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 300px;
+}
+
+.milestone-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
+.milestone-wrapper {
+  flex: 1;
+  position: relative;
+  height: 10px;
+}
+
+.milestone-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: linear-gradient(90deg, #bbdefb 0%, #e1bee7 50%, #f8bbd0 100%);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.milestone-progress-fill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  background: rgba(224, 224, 224, 0.8);
+  border-radius: 0 8px 8px 0;
+  transition: width 0.5s ease;
+}
+
+.milestone-character-runner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translate(-50%, -20%);
+  width: 28px;
+  height: 28px;
+  transition: left 0.5s ease;
+  z-index: 10;
+}
+
+.milestone-character-runner img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.milestone-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e91e63;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .compact-energy-header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .energy-section {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .energy-slider-compact {
+    width: 120px;
+  }
+
+  .milestone-section {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .goal-section,
+  .reset-info {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .milestone-character-runner {
+    width: 24px;
+    height: 24px;
+  }
+}
