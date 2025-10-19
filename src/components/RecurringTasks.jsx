@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import EditTaskModal from './EditTaskModal';
 
-function RecurringTasks({ energyLevel }) {
+function RecurringTasks({ energyLevel, onSwitchToRecord }) {
   const { getTasksByType, addTask, completeTask, deleteTask, updateTask, logHabit, completedTasks } = useApp();
 
   const allRecurringTasks = getTasksByType('recurring');
@@ -466,6 +466,121 @@ function RecurringTasks({ energyLevel }) {
               ➕ Add
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Today's Completions - History Section */}
+      <div style={{
+        marginTop: '30px',
+        background: 'white',
+        border: '2px solid #fff3e0',
+        borderRadius: '12px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+          padding: '15px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#e65100', margin: 0 }}>
+              🔄 Today's Completions
+            </h4>
+            <p style={{ fontSize: '11px', color: '#f57c00', margin: '2px 0 0 0' }}>
+              You logged {completedTasks.filter(t => {
+                const completedDate = new Date(t.completedAt).toDateString();
+                const today = new Date().toDateString();
+                return completedDate === today && t.taskType === 'recurring';
+              }).length} recurring tasks today!
+            </p>
+          </div>
+          <button
+            onClick={() => onSwitchToRecord && onSwitchToRecord('recurring')}
+            style={{
+              padding: '8px 16px',
+              background: '#e65100',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            📊 See All Records
+          </button>
+        </div>
+
+        {/* Scrollable history list - max 7 items */}
+        <div style={{
+          maxHeight: '280px',
+          overflowY: 'auto',
+          padding: '10px'
+        }}>
+          {completedTasks
+            .filter(t => {
+              const completedDate = new Date(t.completedAt).toDateString();
+              const today = new Date().toDateString();
+              return completedDate === today && t.taskType === 'recurring';
+            })
+            .slice(0, 7)
+            .map((task, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '12px 15px',
+                  background: '#f5f5f5',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '14px', color: '#333', fontWeight: 500 }}>
+                    ✓ {task.text}
+                  </span>
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                    {task.recurrence === 'daily' && '📅 Daily'}
+                    {task.recurrence === 'weekly' && `📅 Every ${task.recurDay ? task.recurDay.charAt(0).toUpperCase() + task.recurDay.slice(1) : 'week'}`}
+                    {task.recurrence === 'monthly' && `📅 Monthly`}
+                    {task.recurrence === 'bi-monthly' && `📅 Bi-monthly`}
+                    {' • '}
+                    {new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  background: task.energy === 'low' ? '#e3f2fd' : task.energy === 'med' ? '#fff3e0' : '#fce4ec',
+                  color: task.energy === 'low' ? '#1976d2' : task.energy === 'med' ? '#f57c00' : '#c2185b',
+                  borderRadius: '4px',
+                  fontWeight: 600
+                }}>
+                  {task.energy === 'low' ? '+1 exp' : task.energy === 'med' ? '+2 exp' : '+3 exp'}
+                </span>
+              </div>
+            ))}
+
+          {completedTasks.filter(t => {
+            const completedDate = new Date(t.completedAt).toDateString();
+            const today = new Date().toDateString();
+            return completedDate === today && t.taskType === 'recurring';
+          }).length === 0 && (
+            <div style={{
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#999'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>🔄</div>
+              <p style={{ fontSize: '14px' }}>No recurring tasks completed yet today!</p>
+              <p style={{ fontSize: '12px', color: '#bbb' }}>Complete some to see them here</p>
+            </div>
+          )}
         </div>
       </div>
 

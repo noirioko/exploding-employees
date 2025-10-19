@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { ENERGY_REWARDS } from '../constants/gameConstants';
 import EditTaskModal from './EditTaskModal';
 
-function Habits({ energyLevel }) {
+function Habits({ energyLevel, onSwitchToRecord }) {
   const { getTasksByType, addTask, deleteTask, updateTask, logHabit, completedTasks } = useApp();
 
   const allHabits = getTasksByType('habit');
@@ -113,7 +113,7 @@ function Habits({ energyLevel }) {
                 <img
                   src="/images/cat_habit.png"
                   alt="Cat habit"
-                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                  style={{ width: '120px', height: '120px', objectFit: 'contain' }}
                 />
                 <p>No habits yet! Add one below to start tracking.</p>
               </div>
@@ -206,7 +206,7 @@ function Habits({ energyLevel }) {
                 <img
                   src={habits.some(h => getHabitLogsToday(h.id) > 0) ? '/images/cat_onsen.png' : '/images/cat_habit.png'}
                   alt="Cat"
-                  style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+                  style={{ width: '120px', height: '120px', objectFit: 'contain' }}
                 />
               </div>
             </>
@@ -324,6 +324,116 @@ function Habits({ energyLevel }) {
         </div>
         <div style={{ fontSize: '11px', color: '#999', marginTop: '8px' }}>
           💡 Choose energy level: 🔋 Low (+{ENERGY_REWARDS.low.exp} exp) • ☕ Med (+{ENERGY_REWARDS.med.exp} exp) • ⚡ High (+{ENERGY_REWARDS.high.exp} exp)
+        </div>
+      </div>
+
+      {/* Today's Progress - History Section */}
+      <div style={{
+        marginTop: '30px',
+        background: 'white',
+        border: '2px solid #e8f5e9',
+        borderRadius: '12px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+          padding: '15px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#2e7d32', margin: 0 }}>
+              ✅ Today's Progress
+            </h4>
+            <p style={{ fontSize: '11px', color: '#4caf50', margin: '2px 0 0 0' }}>
+              You logged {completedTasks.filter(t => {
+                const completedDate = new Date(t.completedAt).toDateString();
+                const today = new Date().toDateString();
+                return completedDate === today && t.taskType === 'habit';
+              }).length} habit checks today!
+            </p>
+          </div>
+          <button
+            onClick={() => onSwitchToRecord && onSwitchToRecord('habit')}
+            style={{
+              padding: '8px 16px',
+              background: '#2e7d32',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            📊 See All Records
+          </button>
+        </div>
+
+        {/* Scrollable history list - max 7 items */}
+        <div style={{
+          maxHeight: '280px',
+          overflowY: 'auto',
+          padding: '10px'
+        }}>
+          {completedTasks
+            .filter(t => {
+              const completedDate = new Date(t.completedAt).toDateString();
+              const today = new Date().toDateString();
+              return completedDate === today && t.taskType === 'habit';
+            })
+            .slice(0, 7)
+            .map((task, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '12px 15px',
+                  background: '#f5f5f5',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '14px', color: '#333', fontWeight: 500 }}>
+                    ✓ {task.text}
+                  </span>
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                    {new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  background: task.energy === 'low' ? '#e3f2fd' : task.energy === 'med' ? '#fff3e0' : '#fce4ec',
+                  color: task.energy === 'low' ? '#1976d2' : task.energy === 'med' ? '#f57c00' : '#c2185b',
+                  borderRadius: '4px',
+                  fontWeight: 600
+                }}>
+                  {task.energy === 'low' ? '+1 exp' : task.energy === 'med' ? '+2 exp' : '+3 exp'}
+                </span>
+              </div>
+            ))}
+
+          {completedTasks.filter(t => {
+            const completedDate = new Date(t.completedAt).toDateString();
+            const today = new Date().toDateString();
+            return completedDate === today && t.taskType === 'habit';
+          }).length === 0 && (
+            <div style={{
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#999'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
+              <p style={{ fontSize: '14px' }}>No habits logged yet today!</p>
+              <p style={{ fontSize: '12px', color: '#bbb' }}>Log some habits to see them here</p>
+            </div>
+          )}
         </div>
       </div>
 

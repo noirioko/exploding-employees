@@ -3,13 +3,16 @@ import { useApp } from '../context/AppContext';
 import Calendar from '../components/Calendar';
 
 function Record() {
-  const { completedTasks, getTodaysTasks, getTasksByDate, fakeProductivity, addFakeProductivity, deleteFakeProductivity, deleteCompletedTask, budgetGoals, setBudgetGoals } = useApp();
+  const { completedTasks, getTodaysTasks, getTasksByDate, fakeProductivity, addFakeProductivity, deleteFakeProductivity, updateFakeProductivity } = useApp();
   const [selectedDate, setSelectedDate] = useState(null);
   const [fakeFilter, setFakeFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('daily');
-  const [financeMonth, setFinanceMonth] = useState(new Date());
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [newFakeItem, setNewFakeItem] = useState({
+    activity: '',
+    category: 'cleaning',
+  });
+  const [editingFakeId, setEditingFakeId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
     activity: '',
     category: 'cleaning',
   });
@@ -17,32 +20,16 @@ function Record() {
   const todaysTasks = getTodaysTasks();
   const selectedDateTasks = selectedDate ? getTasksByDate(selectedDate) : [];
 
-  // Filter completed tasks by type
+  // Filter completed tasks by type (excluding finance - that's in Finance Overview now)
   const getDailyTasks = () => completedTasks.filter(t => t.taskType === 'daily');
   const getHabitTasks = () => completedTasks.filter(t => t.taskType === 'habit');
   const getRecurringTasks = () => completedTasks.filter(t => t.taskType === 'recurring');
   const getImpossibleTasks = () => completedTasks.filter(t => t.taskType === 'impossible');
-  const getFinanceTasks = () => completedTasks.filter(t => t.taskType === 'finance');
 
   // Get tasks for selected date by type
   const getSelectedDateTasksByType = (taskType) => {
     if (!selectedDate) return [];
     return selectedDateTasks.filter(t => t.taskType === taskType);
-  };
-
-  // Get finance tasks for selected month
-  const getFinanceByMonth = () => {
-    return getFinanceTasks().filter(task => {
-      const taskDate = new Date(task.completedAt);
-      return taskDate.getMonth() === financeMonth.getMonth() &&
-             taskDate.getFullYear() === financeMonth.getFullYear();
-    });
-  };
-
-  const changeMonth = (direction) => {
-    const newMonth = new Date(financeMonth);
-    newMonth.setMonth(financeMonth.getMonth() + direction);
-    setFinanceMonth(newMonth);
   };
 
   const handleDateSelect = (date) => {
@@ -59,64 +46,39 @@ function Record() {
     }
   };
 
+  const handleEditFake = (item) => {
+    setEditingFakeId(item.id);
+    setEditFormData({
+      activity: item.activity,
+      category: item.category,
+    });
+  };
+
+  const handleSaveFake = (id) => {
+    updateFakeProductivity(id, editFormData);
+    setEditingFakeId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFakeId(null);
+  };
+
+  // Get color coding for task types matching section headers
+  const getTaskTypeColor = (taskType) => {
+    const colors = {
+      'daily': { bg: '#e8eaf6', border: '#9fa8da', text: '#5e35b1' },     // Indigo (Yuwon)
+      'habit': { bg: '#e8f5e9', border: '#a5d6a7', text: '#2e7d32' },     // Green (Jaehyun)
+      'finance': { bg: '#f8e5ef', border: '#f48fb1', text: '#c2185b' },   // Burgundy (Minkyu)
+      'recurring': { bg: '#fff3e0', border: '#ffb74d', text: '#f57c00' }, // Orange (Noah)
+      'impossible': { bg: '#ffebee', border: '#ef5350', text: '#c62828' } // Red (Impossible)
+    };
+    return colors[taskType] || { bg: '#e0e0e0', border: '#bdbdbd', text: '#666' };
+  };
+
   const filteredFakeItems = fakeProductivity.filter(item => {
     if (fakeFilter === 'all') return true;
     return item.category === fakeFilter;
   });
-
-  // Calculate actual income/spending for current period
-  const calculatePeriodTotals = () => {
-    const startDate = new Date(budgetGoals.startDate);
-
-    // Calculate period end based on goal period
-    let periodEnd = new Date(startDate);
-    if (budgetGoals.period === 'weekly') {
-      periodEnd.setDate(startDate.getDate() + 7);
-    } else if (budgetGoals.period === 'monthly') {
-      periodEnd.setMonth(startDate.getMonth() + 1);
-    } else if (budgetGoals.period === 'yearly') {
-      periodEnd.setFullYear(startDate.getFullYear() + 1);
-    }
-
-    // Filter completed finance tasks in current period
-    const periodTasks = completedTasks.filter(task => {
-      if (task.taskType !== 'finance') return false;
-      const taskDate = new Date(task.completedAt);
-      return taskDate >= startDate && taskDate <= periodEnd;
-    });
-
-    const totalIncome = periodTasks
-      .filter(t => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalSpending = Math.abs(periodTasks
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0));
-
-    return { totalIncome, totalSpending, periodEnd };
-  };
-
-  const { totalIncome, totalSpending, periodEnd } = calculatePeriodTotals();
-  const incomeProgress = budgetGoals.incomeGoal > 0 ? (totalIncome / budgetGoals.incomeGoal) * 100 : 0;
-  const spendingProgress = budgetGoals.spendingBudget > 0 ? (totalSpending / budgetGoals.spendingBudget) * 100 : 0;
-
-  // Determine cat state for budget
-  const getBudgetCatState = () => {
-    if (budgetGoals.incomeGoal === 0 && budgetGoals.spendingBudget === 0) {
-      return '/images/cat_finance1.png'; // No goals set
-    }
-
-    const incomeGood = budgetGoals.incomeGoal === 0 || totalIncome >= budgetGoals.incomeGoal;
-    const spendingGood = budgetGoals.spendingBudget === 0 || totalSpending <= budgetGoals.spendingBudget;
-
-    if (incomeGood && spendingGood) {
-      return '/images/cat_finance3.png'; // Goals met!
-    } else if (incomeProgress >= 50 || (spendingProgress <= 75 && budgetGoals.spendingBudget > 0)) {
-      return '/images/cat_finance2.png'; // On track
-    } else {
-      return '/images/cat_sad.png'; // Behind
-    }
-  };
 
   return (
     <div>
@@ -200,7 +162,13 @@ function Record() {
                 ? `📅 ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                 : '📅 All Time'}
             </h3>
-            <div className="browser-container" style={{ marginTop: 0 }}>
+            <div className="browser-container" style={{
+              marginTop: 0,
+              border: '3px solid #ffc1e3',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 4px 12px rgba(233, 30, 99, 0.1)'
+            }}>
               {/* Browser Tabs */}
               <div className="browser-tabs">
                 <div
@@ -234,7 +202,12 @@ function Record() {
               </div>
 
               {/* Browser Content */}
-              <div className="browser-content" style={{ maxHeight: '600px', overflowY: 'auto', padding: '20px' }}>
+              <div className="browser-content" style={{
+                maxHeight: '600px',
+                overflowY: 'auto',
+                padding: '20px',
+                background: 'linear-gradient(135deg, #fff 0%, #fff9fc 100%)'
+              }}>
                 {activeTab === 'daily' && (
                   <div>
                     {(selectedDate ? getSelectedDateTasksByType('daily') : getDailyTasks()).length === 0 ? (
@@ -243,18 +216,29 @@ function Record() {
                         <p>{selectedDate ? 'No to-do list tasks on this date!' : 'No to-do list tasks completed yet!'}</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {(selectedDate ? getSelectedDateTasksByType('daily') : getDailyTasks()).map(task => (
-                          <div key={task.id} className="done-item">
-                            <div className="done-header">
-                              <span className="done-icon">✓</span>
-                              <span className="done-text">{task.text}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(selectedDate ? getSelectedDateTasksByType('daily') : getDailyTasks()).map(task => {
+                          const colors = getTaskTypeColor(task.taskType);
+                          return (
+                            <div key={task.id} style={{
+                              background: colors.bg,
+                              border: `2px solid ${colors.border}`,
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span style={{ color: colors.text, fontSize: '16px', fontWeight: '700' }}>✓</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>{task.text}</div>
+                                <div style={{ fontSize: '11px', color: colors.text, opacity: 0.7, marginTop: '2px' }}>
+                                  {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                              {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -268,18 +252,29 @@ function Record() {
                         <p>{selectedDate ? 'No habits logged on this date!' : 'No habits logged yet!'}</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {(selectedDate ? getSelectedDateTasksByType('habit') : getHabitTasks()).map(task => (
-                          <div key={task.id} className="done-item">
-                            <div className="done-header">
-                              <span className="done-icon">✓</span>
-                              <span className="done-text">{task.text}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(selectedDate ? getSelectedDateTasksByType('habit') : getHabitTasks()).map(task => {
+                          const colors = getTaskTypeColor(task.taskType);
+                          return (
+                            <div key={task.id} style={{
+                              background: colors.bg,
+                              border: `2px solid ${colors.border}`,
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span style={{ color: colors.text, fontSize: '16px', fontWeight: '700' }}>✓</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>{task.text}</div>
+                                <div style={{ fontSize: '11px', color: colors.text, opacity: 0.7, marginTop: '2px' }}>
+                                  {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                              {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -293,18 +288,29 @@ function Record() {
                         <p>{selectedDate ? 'No recurring tasks on this date!' : 'No recurring tasks completed yet!'}</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {(selectedDate ? getSelectedDateTasksByType('recurring') : getRecurringTasks()).map(task => (
-                          <div key={task.id} className="done-item">
-                            <div className="done-header">
-                              <span className="done-icon">✓</span>
-                              <span className="done-text">{task.text}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(selectedDate ? getSelectedDateTasksByType('recurring') : getRecurringTasks()).map(task => {
+                          const colors = getTaskTypeColor(task.taskType);
+                          return (
+                            <div key={task.id} style={{
+                              background: colors.bg,
+                              border: `2px solid ${colors.border}`,
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span style={{ color: colors.text, fontSize: '16px', fontWeight: '700' }}>✓</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>{task.text}</div>
+                                <div style={{ fontSize: '11px', color: colors.text, opacity: 0.7, marginTop: '2px' }}>
+                                  {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                              {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -318,318 +324,34 @@ function Record() {
                         <p>{selectedDate ? 'No impossible tasks on this date!' : 'No impossible tasks completed yet!'}</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {(selectedDate ? getSelectedDateTasksByType('impossible') : getImpossibleTasks()).map(task => (
-                          <div key={task.id} className="done-item">
-                            <div className="done-header">
-                              <span className="done-icon">✓</span>
-                              <span className="done-text">{task.text}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(selectedDate ? getSelectedDateTasksByType('impossible') : getImpossibleTasks()).map(task => {
+                          const colors = getTaskTypeColor(task.taskType);
+                          return (
+                            <div key={task.id} style={{
+                              background: colors.bg,
+                              border: `2px solid ${colors.border}`,
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span style={{ color: colors.text, fontSize: '16px', fontWeight: '700' }}>✓</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>{task.text}</div>
+                                <div style={{ fontSize: '11px', color: colors.text, opacity: 0.7, marginTop: '2px' }}>
+                                  {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                              {new Date(task.completedAt).toLocaleDateString()} • +{task.expEarned} exp, +{task.wonEarned} won
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Finance Section with Month Navigation */}
-        <div style={{ marginTop: '40px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '20px', color: '#e91e63' }}>💰 Finance Records</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <button
-                onClick={() => changeMonth(-1)}
-                style={{
-                  background: 'white',
-                  border: '2px solid #e0e0e0',
-                  borderRadius: '6px',
-                  padding: '8px 15px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                }}
-              >
-                ←
-              </button>
-              <span style={{ fontSize: '16px', fontWeight: 600, color: '#666', minWidth: '150px', textAlign: 'center' }}>
-                {financeMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </span>
-              <button
-                onClick={() => changeMonth(1)}
-                style={{
-                  background: 'white',
-                  border: '2px solid #e0e0e0',
-                  borderRadius: '6px',
-                  padding: '8px 15px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                }}
-              >
-                →
-              </button>
-            </div>
-          </div>
-
-          {/* Finance Table */}
-          <div className="tasks-table">
-            <div className="table-header">
-              <div className="col-task">Description</div>
-              <div className="col-deadline" style={{ minWidth: '150px' }}>Category</div>
-              <div className="col-deadline">Amount</div>
-              <div className="col-category">Date</div>
-              <div className="col-actions">Actions</div>
-            </div>
-
-            <div className="table-body">
-              {getFinanceByMonth().length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-icon">💰</div>
-                  <p>No finance records for this month.</p>
-                </div>
-              ) : (
-                getFinanceByMonth().map(log => {
-                  const getCategoryLabel = () => {
-                    const categories = {
-                      'salary': '💼 Salary',
-                      'freelance': '💻 Freelance',
-                      'gift': '🎁 Gift',
-                      'other-income': '➕ Other Income',
-                      'food-beverages': '🍔 Food & Beverages',
-                      'life': '🏠 Life (Bills, Rent)',
-                      'pets': '🐾 Pets',
-                      'fun-games': '🎮 Fun & Games',
-                      'gacha': '🎰 Gacha & Gambling',
-                      'impulse': '💸 Impulse Buy',
-                      'transport': '🚗 Transport',
-                      'other-outcome': '➖ Other Outcome'
-                    };
-                    return categories[log.financeCategory] || log.financeCategory || 'No category';
-                  };
-
-                  return (
-                    <div key={log.id} className="task-row">
-                      <div className="col-task">
-                        <span className="task-text">{log.text}</span>
-                      </div>
-                      <div className="col-deadline" style={{ fontSize: '12px', color: '#666' }}>
-                        {getCategoryLabel()}
-                      </div>
-                      <div className="col-deadline" style={{ fontSize: '16px', fontWeight: '700', color: log.amount > 0 ? '#4caf50' : '#ff5252' }}>
-                        {log.amount > 0 ? '+' : ''}{log.amount} ₩
-                      </div>
-                      <div className="col-category">
-                        {new Date(log.completedAt).toLocaleDateString()}
-                      </div>
-                      <div className="col-actions">
-                        <button
-                          className="delete-btn task-btn"
-                          onClick={() => deleteCompletedTask(log.id)}
-                          style={{ fontSize: '12px', padding: '6px 10px' }}
-                        >
-                          ✕ Delete
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Finance Summary */}
-          <div style={{ marginTop: '15px', display: 'flex', gap: '20px', justifyContent: 'flex-end' }}>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              <strong>Total Income:</strong> <span style={{ color: '#4caf50', fontWeight: 700 }}>
-                +{getFinanceByMonth().filter(t => t.amount > 0).reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)} ₩
-              </span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              <strong>Total Expenses:</strong> <span style={{ color: '#ff5252', fontWeight: 700 }}>
-                {getFinanceByMonth().filter(t => t.amount < 0).reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)} ₩
-              </span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              <strong>Net:</strong> <span style={{ fontWeight: 700, color: getFinanceByMonth().reduce((sum, t) => sum + parseFloat(t.amount || 0), 0) >= 0 ? '#4caf50' : '#ff5252' }}>
-                {getFinanceByMonth().reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)} ₩
-              </span>
-            </div>
-          </div>
-
-          {/* Budget Goals Tracker */}
-          <div style={{
-            background: 'linear-gradient(135deg, #fff9e6 0%, #ffe6f0 100%)',
-            border: '3px solid #ffd93d',
-            borderRadius: '12px',
-            padding: '20px',
-            marginTop: '30px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h3 style={{ fontSize: '18px', color: '#c2185b', margin: 0 }}>
-                💰 Budget Goals ({budgetGoals.period.charAt(0).toUpperCase() + budgetGoals.period.slice(1)})
-              </h3>
-              <button
-                onClick={() => setShowBudgetModal(!showBudgetModal)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#c2185b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 600
-                }}
-              >
-                ⚙️ {showBudgetModal ? 'Close' : 'Set Goals'}
-              </button>
-            </div>
-
-            {/* Budget Settings Modal */}
-            {showBudgetModal && (
-              <div style={{
-                background: 'white',
-                padding: '15px',
-                borderRadius: '8px',
-                marginBottom: '15px',
-                border: '2px solid #e0e0e0'
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Period:</label>
-                    <select
-                      value={budgetGoals.period}
-                      onChange={(e) => setBudgetGoals({ ...budgetGoals, period: e.target.value, startDate: new Date().toISOString() })}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        border: '2px solid #e0e0e0',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Income Goal (₩):</label>
-                    <input
-                      type="number"
-                      value={budgetGoals.incomeGoal}
-                      onChange={(e) => setBudgetGoals({ ...budgetGoals, incomeGoal: Number(e.target.value) })}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        border: '2px solid #e0e0e0',
-                        borderRadius: '6px',
-                        fontSize: '14px'
-                      }}
-                      placeholder="e.g., 10000"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px' }}>Spending Budget (₩):</label>
-                  <input
-                    type="number"
-                    value={budgetGoals.spendingBudget}
-                    onChange={(e) => setBudgetGoals({ ...budgetGoals, spendingBudget: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                    placeholder="e.g., 5000"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Progress Display */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-              {/* Income Progress */}
-              <div style={{ background: 'white', padding: '15px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>💵 Income</div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#4caf50', marginBottom: '8px' }}>
-                  {totalIncome.toLocaleString()} ₩
-                </div>
-                {budgetGoals.incomeGoal > 0 && (
-                  <>
-                    <div style={{ fontSize: '11px', color: '#999', marginBottom: '5px' }}>
-                      Goal: {budgetGoals.incomeGoal.toLocaleString()} ₩
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${Math.min(incomeProgress, 100)}%`,
-                        height: '100%',
-                        background: incomeProgress >= 100 ? '#4caf50' : '#ffa726',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
-                      {incomeProgress.toFixed(0)}%
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Spending Progress */}
-              <div style={{ background: 'white', padding: '15px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>💸 Spending</div>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#ff5252', marginBottom: '8px' }}>
-                  {totalSpending.toLocaleString()} ₩
-                </div>
-                {budgetGoals.spendingBudget > 0 && (
-                  <>
-                    <div style={{ fontSize: '11px', color: '#999', marginBottom: '5px' }}>
-                      Budget: {budgetGoals.spendingBudget.toLocaleString()} ₩
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${Math.min(spendingProgress, 100)}%`,
-                        height: '100%',
-                        background: spendingProgress > 100 ? '#ff5252' : spendingProgress > 75 ? '#ffa726' : '#4caf50',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
-                      {spendingProgress.toFixed(0)}%
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Cat State */}
-              <div style={{
-                background: 'white',
-                padding: '15px',
-                borderRadius: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <img
-                  src={getBudgetCatState()}
-                  alt="Cat status"
-                  style={{ width: '80px', height: '80px', objectFit: 'contain' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ fontSize: '11px', color: '#999', textAlign: 'center' }}>
-              Period ends: {periodEnd.toLocaleDateString()}
             </div>
           </div>
         </div>
@@ -678,12 +400,12 @@ function Record() {
           </div>
 
           {/* Fake Productivity Table */}
-          <div className="fake-prod-table">
-            <div className="table-header">
-              <div className="col-fake-activity">Activity</div>
-              <div className="col-fake-category">Category</div>
-              <div className="col-fake-date">Date</div>
-              <div className="col-fake-actions">Actions</div>
+          <div className="tasks-table">
+            <div className="table-header" style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr' }}>
+              <div>Activity</div>
+              <div>Category</div>
+              <div>Date</div>
+              <div>Actions</div>
             </div>
             <div className="table-body">
               {filteredFakeItems.length === 0 ? (
@@ -694,25 +416,68 @@ function Record() {
               ) : (
                 <>
                   {filteredFakeItems.map(item => (
-                    <div key={item.id} className="fake-prod-item">
-                      <div className="fake-prod-text">{item.activity}</div>
-                      <span className={`fake-prod-category ${item.category}`}>
-                        {item.category === 'cleaning' && '🧹 Cleaning'}
-                        {item.category === 'work' && '💼 Actual Work'}
-                        {item.category === 'fake' && '✨ Fake Productivity'}
-                      </span>
-                      <div className="fake-prod-date">
-                        {new Date(item.date).toLocaleDateString()}
+                    editingFakeId === item.id ? (
+                      // Edit Mode
+                      <div key={item.id} className="task-row" style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr' }}>
+                        <div className="col-task">
+                          <input
+                            type="text"
+                            className="quick-input"
+                            value={editFormData.activity}
+                            onChange={(e) => setEditFormData({ ...editFormData, activity: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <select
+                            className="quick-select"
+                            value={editFormData.category}
+                            onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                          >
+                            <option value="cleaning">🧹 Cleaning</option>
+                            <option value="work">💼 Actual Work</option>
+                            <option value="fake">✨ Fake Productivity</option>
+                          </select>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>
+                          {new Date(item.date).toLocaleDateString()}
+                        </div>
+                        <div className="col-actions">
+                          <button className="edit-btn task-btn" onClick={() => handleSaveFake(item.id)}>
+                            ✓
+                          </button>
+                          <button className="delete-btn task-btn" onClick={handleCancelEdit}>
+                            ✕
+                          </button>
+                        </div>
                       </div>
-                      <div className="col-fake-actions">
-                        <button
-                          className="delete-btn task-btn"
-                          onClick={() => deleteFakeProductivity(item.id)}
-                        >
-                          ✕
-                        </button>
+                    ) : (
+                      // View Mode
+                      <div key={item.id} className="task-row" style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr' }}>
+                        <div className="col-task">
+                          <span className="task-text">{item.activity}</span>
+                        </div>
+                        <div style={{ fontSize: '13px' }}>
+                          <span className={`category-badge ${item.category}`} style={{
+                            background: item.category === 'cleaning' ? '#4caf50' : item.category === 'work' ? '#2196f3' : '#ff9800'
+                          }}>
+                            {item.category === 'cleaning' && '🧹 Cleaning'}
+                            {item.category === 'work' && '💼 Actual Work'}
+                            {item.category === 'fake' && '✨ Fake'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>
+                          {new Date(item.date).toLocaleDateString()}
+                        </div>
+                        <div className="col-actions">
+                          <button className="edit-btn task-btn" onClick={() => handleEditFake(item)}>
+                            ✏️
+                          </button>
+                          <button className="delete-btn task-btn" onClick={() => deleteFakeProductivity(item.id)}>
+                            ✕
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )
                   ))}
 
                   {/* Cat at bottom when items exist */}
@@ -725,7 +490,7 @@ function Record() {
                     borderTop: '2px dashed #e0e0e0'
                   }}>
                     <img
-                      src='/images/cat_productivity.png'
+                      src='/images/diving_cat.png'
                       alt="Cat"
                       style={{ width: '100px', height: '100px', objectFit: 'contain' }}
                     />
@@ -745,17 +510,17 @@ function Record() {
             </div>
 
             {/* Quick Add Row */}
-            <div className="quick-add-row">
+            <div className="quick-add-row" style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr' }}>
               <input
                 type="text"
-                className="quick-input col-fake-activity"
+                className="quick-input"
                 placeholder="What did you pretend to do productively?..."
                 value={newFakeItem.activity}
                 onChange={(e) => setNewFakeItem({ ...newFakeItem, activity: e.target.value })}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddFakeItem()}
               />
               <select
-                className="quick-select col-fake-category"
+                className="quick-select"
                 value={newFakeItem.category}
                 onChange={(e) => setNewFakeItem({ ...newFakeItem, category: e.target.value })}
               >
@@ -763,14 +528,12 @@ function Record() {
                 <option value="work">💼 Actual Work</option>
                 <option value="fake">✨ Fake Productivity</option>
               </select>
-              <div className="col-fake-date" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>
                 (auto: today)
               </div>
-              <div className="col-fake-actions">
-                <button className="quick-add-btn" onClick={handleAddFakeItem}>
-                  ➕ Add
-                </button>
-              </div>
+              <button className="quick-add-btn" onClick={handleAddFakeItem}>
+                ➕ Add
+              </button>
             </div>
           </div>
         </div>

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import EditTaskModal from './EditTaskModal';
 
-function DailyTasks({ energyLevel }) {
-  const { getTasksByType, addTask, completeTask, deleteTask, updateTask } = useApp();
+function DailyTasks({ energyLevel, onSwitchToRecord }) {
+  const { getTasksByType, addTask, completeTask, deleteTask, updateTask, completedTasks } = useApp();
 
   const allDailyTasks = getTasksByType('daily');
 
@@ -26,6 +26,7 @@ function DailyTasks({ energyLevel }) {
   const [editingTask, setEditingTask] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState('none');
+  const [categoryFilter, setCategoryFilter] = useState(new Set(['art', 'webtoon', 'business', 'life'])); // All categories visible by default
 
   const handleDone = (taskId) => {
     setStampedTasks(prev => new Set(prev).add(taskId));
@@ -97,12 +98,26 @@ function DailyTasks({ energyLevel }) {
     return diffDays >= 0 && diffDays <= 2; // Today, tomorrow, or day after
   };
 
-  // Sort tasks
-  const getSortedTasks = () => {
-    let sorted = [...dailyTasks];
+  // Toggle category filter
+  const toggleCategory = (category) => {
+    setCategoryFilter(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
+  // Filter and sort tasks
+  const getFilteredAndSortedTasks = () => {
+    // First filter by category
+    let filtered = dailyTasks.filter(task => categoryFilter.has(task.category));
 
     // Always sort urgent tasks to the top first, regardless of sort option
-    sorted.sort((a, b) => {
+    filtered.sort((a, b) => {
       const aUrgent = isUrgent(a);
       const bUrgent = isUrgent(b);
       if (aUrgent && !bUrgent) return -1;
@@ -112,7 +127,7 @@ function DailyTasks({ energyLevel }) {
 
     // Then apply secondary sort if not in default mode
     if (sortBy === 'dueDate') {
-      sorted.sort((a, b) => {
+      filtered.sort((a, b) => {
         // Keep urgent at top
         const aUrgent = isUrgent(a);
         const bUrgent = isUrgent(b);
@@ -126,7 +141,7 @@ function DailyTasks({ energyLevel }) {
       });
     } else if (sortBy === 'energy') {
       const energyOrder = { low: 1, med: 2, high: 3 };
-      sorted.sort((a, b) => {
+      filtered.sort((a, b) => {
         // Keep urgent at top
         const aUrgent = isUrgent(a);
         const bUrgent = isUrgent(b);
@@ -135,22 +150,12 @@ function DailyTasks({ energyLevel }) {
 
         return energyOrder[a.energy || 'med'] - energyOrder[b.energy || 'med'];
       });
-    } else if (sortBy === 'category') {
-      sorted.sort((a, b) => {
-        // Keep urgent at top
-        const aUrgent = isUrgent(a);
-        const bUrgent = isUrgent(b);
-        if (aUrgent && !bUrgent) return -1;
-        if (!aUrgent && bUrgent) return 1;
-
-        return (a.category || '').localeCompare(b.category || '');
-      });
     }
 
-    return sorted;
+    return filtered;
   };
 
-  const sortedTasks = getSortedTasks();
+  const sortedTasks = getFilteredAndSortedTasks();
 
   return (
     <div className="task-section section-todolist" style={{ marginBottom: '30px' }}>
@@ -187,67 +192,124 @@ function DailyTasks({ energyLevel }) {
 
         {/* Sort Tabs - Right Side */}
         {dailyTasks.length > 0 && (
-          <div style={{ display: 'flex', gap: '8px', paddingBottom: '8px' }}>
-            <button
-              onClick={() => setSortBy('none')}
-              style={{
-                padding: '6px 12px',
-                background: sortBy === 'none' ? '#5e35b1' : '#e8eaf6',
-                color: sortBy === 'none' ? 'white' : '#5e35b1',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Default
-            </button>
-            <button
-              onClick={() => setSortBy('dueDate')}
-              style={{
-                padding: '6px 12px',
-                background: sortBy === 'dueDate' ? '#5e35b1' : '#e8eaf6',
-                color: sortBy === 'dueDate' ? 'white' : '#5e35b1',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              📅 Due Date
-            </button>
-            <button
-              onClick={() => setSortBy('energy')}
-              style={{
-                padding: '6px 12px',
-                background: sortBy === 'energy' ? '#5e35b1' : '#e8eaf6',
-                color: sortBy === 'energy' ? 'white' : '#5e35b1',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              ⚡ Energy
-            </button>
-            <button
-              onClick={() => setSortBy('category')}
-              style={{
-                padding: '6px 12px',
-                background: sortBy === 'category' ? '#5e35b1' : '#e8eaf6',
-                color: sortBy === 'category' ? 'white' : '#5e35b1',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              🏷️ Category
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '8px', alignItems: 'flex-end' }}>
+            {/* Sort Options */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setSortBy('none')}
+                style={{
+                  padding: '6px 12px',
+                  background: sortBy === 'none' ? '#5e35b1' : '#e8eaf6',
+                  color: sortBy === 'none' ? 'white' : '#5e35b1',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Default
+              </button>
+              <button
+                onClick={() => setSortBy('dueDate')}
+                style={{
+                  padding: '6px 12px',
+                  background: sortBy === 'dueDate' ? '#5e35b1' : '#e8eaf6',
+                  color: sortBy === 'dueDate' ? 'white' : '#5e35b1',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                📅 Due Date
+              </button>
+              <button
+                onClick={() => setSortBy('energy')}
+                style={{
+                  padding: '6px 12px',
+                  background: sortBy === 'energy' ? '#5e35b1' : '#e8eaf6',
+                  color: sortBy === 'energy' ? 'white' : '#5e35b1',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                ⚡ Energy
+              </button>
+            </div>
+
+            {/* Category Filters */}
+            <div style={{ display: 'flex', gap: '6px', fontSize: '11px' }}>
+              <span style={{ color: '#999', fontWeight: 600, marginRight: '4px', alignSelf: 'center' }}>Show:</span>
+              <button
+                onClick={() => toggleCategory('art')}
+                style={{
+                  padding: '4px 10px',
+                  background: categoryFilter.has('art') ? '#ffebee' : '#f5f5f5',
+                  color: categoryFilter.has('art') ? '#c62828' : '#999',
+                  border: categoryFilter.has('art') ? '2px solid #c62828' : '2px solid transparent',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: categoryFilter.has('art') ? 1 : 0.5
+                }}
+              >
+                🎨 Art
+              </button>
+              <button
+                onClick={() => toggleCategory('webtoon')}
+                style={{
+                  padding: '4px 10px',
+                  background: categoryFilter.has('webtoon') ? '#e8f5e9' : '#f5f5f5',
+                  color: categoryFilter.has('webtoon') ? '#2e7d32' : '#999',
+                  border: categoryFilter.has('webtoon') ? '2px solid #2e7d32' : '2px solid transparent',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: categoryFilter.has('webtoon') ? 1 : 0.5
+                }}
+              >
+                📖 Webtoon
+              </button>
+              <button
+                onClick={() => toggleCategory('business')}
+                style={{
+                  padding: '4px 10px',
+                  background: categoryFilter.has('business') ? '#fff3e0' : '#f5f5f5',
+                  color: categoryFilter.has('business') ? '#f57c00' : '#999',
+                  border: categoryFilter.has('business') ? '2px solid #f57c00' : '2px solid transparent',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: categoryFilter.has('business') ? 1 : 0.5
+                }}
+              >
+                💼 Business
+              </button>
+              <button
+                onClick={() => toggleCategory('life')}
+                style={{
+                  padding: '4px 10px',
+                  background: categoryFilter.has('life') ? '#e3f2fd' : '#f5f5f5',
+                  color: categoryFilter.has('life') ? '#1976d2' : '#999',
+                  border: categoryFilter.has('life') ? '2px solid #1976d2' : '2px solid transparent',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: categoryFilter.has('life') ? 1 : 0.5
+                }}
+              >
+                🏠 Life
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -431,6 +493,128 @@ function DailyTasks({ energyLevel }) {
               ➕ Add
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Today's Wins - History Section */}
+      <div style={{
+        marginTop: '30px',
+        background: 'white',
+        border: '2px solid #e8eaf6',
+        borderRadius: '12px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #e8eaf6 0%, #d1c4e9 100%)',
+          padding: '15px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#5e35b1', margin: 0 }}>
+              🎉 Today's Wins
+            </h4>
+            <p style={{ fontSize: '11px', color: '#7e57c2', margin: '2px 0 0 0' }}>
+              You completed {completedTasks.filter(t => {
+                const completedDate = new Date(t.completedAt).toDateString();
+                const today = new Date().toDateString();
+                return completedDate === today && t.taskType === 'daily';
+              }).length} tasks today!
+            </p>
+          </div>
+          <button
+            onClick={() => onSwitchToRecord && onSwitchToRecord('daily')}
+            style={{
+              padding: '8px 16px',
+              background: '#5e35b1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            📊 See All Records
+          </button>
+        </div>
+
+        {/* Scrollable history list - max 7 items */}
+        <div style={{
+          maxHeight: '280px',
+          overflowY: 'auto',
+          padding: '10px'
+        }}>
+          {completedTasks
+            .filter(t => {
+              const completedDate = new Date(t.completedAt).toDateString();
+              const today = new Date().toDateString();
+              return completedDate === today && t.taskType === 'daily';
+            })
+            .slice(0, 7)
+            .map((task, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '8px 12px',
+                  background: '#f5f5f5',
+                  borderRadius: '6px',
+                  marginBottom: '6px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: '13px', color: '#333', fontWeight: 500 }}>
+                    ✓ {task.text}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {task.category && (
+                    <span className={`category-badge ${task.category}`} style={{ fontSize: '9px', padding: '2px 6px' }}>
+                      {task.category === 'art' && '🎨'}
+                      {task.category === 'webtoon' && '📖'}
+                      {task.category === 'business' && '💼'}
+                      {task.category === 'life' && '🏠'}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '10px', color: '#999', whiteSpace: 'nowrap' }}>
+                    {new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span style={{
+                    fontSize: '14px',
+                    padding: '6px 12px',
+                    background: task.energy === 'low' ? '#e3f2fd' : task.energy === 'med' ? '#fff3e0' : '#fce4ec',
+                    color: task.energy === 'low' ? '#1976d2' : task.energy === 'med' ? '#f57c00' : '#c2185b',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {task.energy === 'low' ? '+1' : task.energy === 'med' ? '+2' : '+3'} exp
+                  </span>
+                </div>
+              </div>
+            ))}
+
+          {completedTasks.filter(t => {
+            const completedDate = new Date(t.completedAt).toDateString();
+            const today = new Date().toDateString();
+            return completedDate === today && t.taskType === 'daily';
+          }).length === 0 && (
+            <div style={{
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#999'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>📝</div>
+              <p style={{ fontSize: '14px' }}>No tasks completed yet today!</p>
+              <p style={{ fontSize: '12px', color: '#bbb' }}>Complete some tasks to see them here</p>
+            </div>
+          )}
         </div>
       </div>
 
