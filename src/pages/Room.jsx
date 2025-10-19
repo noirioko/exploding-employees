@@ -5,6 +5,7 @@ import { placesConfig } from '../data/places';
 import { recipes, canCookRecipe, getRecipeById } from '../data/recipes';
 import { getItemById } from '../data/shopItems';
 import { getGiftReaction, getHeartCount } from '../data/giftPreferences';
+import { getRouteForCharacter } from '../data/characterRoutes';
 
 function Room() {
   const {
@@ -18,7 +19,12 @@ function Room() {
     cookRecipe,
     giftDish,
     friendshipPoints,
-    addFriendshipPoints
+    addFriendshipPoints,
+    placedCharacters,
+    setPlacedCharacters,
+    placeCharacter,
+    removeCharacter,
+    isCharacterPlaced
   } = useApp();
 
   const navigate = useNavigate();
@@ -111,24 +117,12 @@ function Room() {
   ];
   const [currentNoahMessage, setCurrentNoahMessage] = useState(0);
 
-  // Noah character state
-  const [noah, setNoah] = useState({
-    x: 54,
-    y: 112,
-    collisionWidth: 12,
-    collisionHeight: 12,
-    originalX: 54,
-    facingLeft: false,
-    isWalking: false,
-    direction: 'down'
-  });
 
   // Refs for game loop
   const positionRef = useRef({ x: 320, y: 180 });
   const directionRef = useRef('down');
   const isWalkingRef = useRef(false);
   const proximityCheckCounter = useRef(0);
-  const noahRef = useRef(noah);
   const collisionZonesRef = useRef(collisionZones);
   const nearbyCharacterRef = useRef(nearbyCharacter);
 
@@ -144,10 +138,6 @@ function Room() {
   });
 
   // Sync refs with state
-  useEffect(() => {
-    noahRef.current = noah;
-  }, [noah]);
-
   useEffect(() => {
     collisionZonesRef.current = collisionZones;
   }, [collisionZones]);
@@ -192,15 +182,18 @@ function Room() {
         const nearby = nearbyCharacterRef.current;
 
         if (nearby === 'noah') {
-          const yuwonX = positionRef.current.x;
-          const noahX = noahRef.current.x;
-          const faceDirection = yuwonX > noahX ? 'right' : 'left';
+          const noahChar = placedCharacters.find(c => c.character === 'noah');
+          if (noahChar) {
+            const yuwonX = positionRef.current.x;
+            const noahX = noahChar.x;
+            const faceDirection = yuwonX > noahX ? 'right' : 'left';
 
-          setNoah(prev => ({
-            ...prev,
-            direction: faceDirection,
-            isWalking: false
-          }));
+            setPlacedCharacters(prev => prev.map(c =>
+              c.character === 'noah'
+                ? { ...c, direction: faceDirection, isWalking: false }
+                : c
+            ));
+          }
 
           // If holding an item, gift it to Noah
           if (heldItem && heldItem.type === 'dish') {
@@ -249,16 +242,20 @@ function Room() {
       const playerTop = newY - hitboxSize / 2 + hitboxOffsetY;
       const playerBottom = newY + hitboxSize / 2 + hitboxOffsetY;
 
-      // Check collision with Noah
-      const currentNoah = noahRef.current;
-      const noahLeft = currentNoah.x - currentNoah.collisionWidth / 2;
-      const noahRight = currentNoah.x + currentNoah.collisionWidth / 2;
-      const noahTop = currentNoah.y - currentNoah.collisionHeight / 2 + 10; // 10px lower
-      const noahBottom = currentNoah.y + currentNoah.collisionHeight / 2 + 10; // 10px lower
+      // Check collision with Noah (if present)
+      const noahChar = placedCharacters.find(c => c.character === 'noah');
+      if (noahChar) {
+        const noahCollisionWidth = 20;
+        const noahCollisionHeight = 20;
+        const noahLeft = noahChar.x - noahCollisionWidth / 2;
+        const noahRight = noahChar.x + noahCollisionWidth / 2;
+        const noahTop = noahChar.y - noahCollisionHeight / 2 + 10; // 10px lower
+        const noahBottom = noahChar.y + noahCollisionHeight / 2 + 10; // 10px lower
 
-      if (playerRight > noahLeft && playerLeft < noahRight &&
-          playerBottom > noahTop && playerTop < noahBottom) {
-        return true;
+        if (playerRight > noahLeft && playerLeft < noahRight &&
+            playerBottom > noahTop && playerTop < noahBottom) {
+          return true;
+        }
       }
 
       // Check collision with zones
@@ -318,23 +315,25 @@ function Room() {
       if (proximityCheckCounter.current >= 10) {
         proximityCheckCounter.current = 0;
 
-        const currentNoah = noahRef.current;
-        const distanceToNoah = Math.sqrt(
-          Math.pow(positionRef.current.x - currentNoah.x, 2) +
-          Math.pow(positionRef.current.y - currentNoah.y, 2)
-        );
-
         const wasNearby = nearbyCharacterRef.current === 'noah';
         const enterDistance = 45;
         const exitDistance = 60;
 
-        // Check Noah proximity
+        // Check Noah proximity (if present)
         let nearestInteractable = null;
         let nearestDistance = Infinity;
 
-        if (distanceToNoah < enterDistance) {
-          nearestInteractable = 'noah';
-          nearestDistance = distanceToNoah;
+        const noahChar = placedCharacters.find(c => c.character === 'noah');
+        if (noahChar) {
+          const distanceToNoah = Math.sqrt(
+            Math.pow(positionRef.current.x - noahChar.x, 2) +
+            Math.pow(positionRef.current.y - noahChar.y, 2)
+          );
+
+          if (distanceToNoah < enterDistance) {
+            nearestInteractable = 'noah';
+            nearestDistance = distanceToNoah;
+          }
         }
 
         // Check interaction zone proximity (fridge, stove, table)
@@ -376,92 +375,201 @@ function Room() {
     };
   }, []);
 
-  // Noah's idle pacing AI
+  // Character movement state - tracks waypoint progress for each character
+  const [characterMovementState, setCharacterMovementState] = useState({});
+
+  // Initialize movement state for placed characters with routes
   useEffect(() => {
-    if (showVNDialogue && vnDialogueType === 'noah') {
-      return;
-    }
-
-    let phase = 'paused-left-down'; // Start facing down at left position
-    let pauseTimer = 0;
-    let animationFrameId;
-
-    const updateNoah = () => {
-      setNoah(prev => {
-        let newX = prev.x;
-        let newDirection = prev.direction;
-        let newIsWalking = false;
-
-        // Left position - face down (front)
-        if (phase === 'paused-left-down') {
-          pauseTimer++;
-          newDirection = 'down';
-          newIsWalking = false;
-          if (pauseTimer > 180) { // 3 seconds
-            phase = 'walking-right';
-            pauseTimer = 0;
-          }
-        }
-        // Walking right
-        else if (phase === 'walking-right') {
-          newX += 0.3;
-          newDirection = 'right';
-          newIsWalking = true;
-          if (newX >= 125) {
-            phase = 'paused-right-side';
-            pauseTimer = 0;
-            newX = 125;
-          }
-        }
-        // Right position - look right for 3 seconds
-        else if (phase === 'paused-right-side') {
-          pauseTimer++;
-          newDirection = 'right';
-          newIsWalking = false;
-          if (pauseTimer > 180) { // 3 seconds
-            phase = 'paused-right-up';
-            pauseTimer = 0;
-          }
-        }
-        // Right position - look up for 10 seconds
-        else if (phase === 'paused-right-up') {
-          pauseTimer++;
-          newDirection = 'up';
-          newIsWalking = false;
-          if (pauseTimer > 600) { // 10 seconds
-            phase = 'walking-left';
-            pauseTimer = 0;
-          }
-        }
-        // Walking left
-        else if (phase === 'walking-left') {
-          newX -= 0.3;
-          newDirection = 'left';
-          newIsWalking = true;
-          if (newX <= 54) {
-            phase = 'paused-left-down';
-            pauseTimer = 0;
-            newX = 54;
-          }
-        }
-
-        return {
-          ...prev,
-          x: newX,
-          direction: newDirection,
-          isWalking: newIsWalking
+    const newState = {};
+    placedCharacters.forEach(char => {
+      const route = getRouteForCharacter(char.character);
+      if (route && !characterMovementState[char.id]) {
+        newState[char.id] = {
+          waypointIndex: route.startWaypointIndex || 0,
+          pauseTimer: 0
         };
+      }
+    });
+
+    if (Object.keys(newState).length > 0) {
+      setCharacterMovementState(prev => ({ ...prev, ...newState }));
+    }
+  }, [placedCharacters]);
+
+  // Character movement system using waypoint routes
+  useEffect(() => {
+    let animationFrameId;
+    const movementSpeed = 0.3;
+
+    const updateCharacters = () => {
+      setPlacedCharacters(prev => {
+        const charactersToRemove = [];
+
+        const updatedCharacters = prev.map(char => {
+          const currentStage = char.routeStage || 'patrol';
+          const route = getRouteForCharacter(char.character, currentStage);
+          if (!route || !characterMovementState[char.id]) {
+            return char;
+          }
+
+          const state = characterMovementState[char.id];
+          const waypoint = route.waypoints[state.waypointIndex];
+
+          if (!waypoint) {
+            return char;
+          }
+
+          let newX = char.x;
+          let newY = char.y || waypoint.y;
+          let newDirection = char.direction || waypoint.direction;
+          let newIsWalking = false;
+          let newWaypointIndex = state.waypointIndex;
+          let newPauseTimer = state.pauseTimer;
+          let newRouteStage = currentStage;
+
+          // Handle pause action
+          if (waypoint.action === 'pause' || waypoint.action === 'idle') {
+            newDirection = waypoint.direction;
+            newIsWalking = false;
+            newPauseTimer++;
+
+            if (newPauseTimer > waypoint.pauseDuration) {
+              // Move to next waypoint
+              if (route.type === 'going_home' && state.waypointIndex === route.waypoints.length - 1) {
+                // Reached end of going_home route - mark for removal
+                charactersToRemove.push(char.id);
+                return char;
+              } else if (route.type === 'just_invited' && state.waypointIndex === route.waypoints.length - 1) {
+                // Finished entrance animation - transition to patrol
+                newRouteStage = 'patrol';
+                newWaypointIndex = 0;
+                newPauseTimer = 0;
+              } else {
+                newWaypointIndex = (state.waypointIndex + 1) % route.waypoints.length;
+                newPauseTimer = 0;
+              }
+            }
+          }
+          // Handle walk action
+          else if (waypoint.action === 'walk') {
+            newIsWalking = true;
+            newDirection = waypoint.direction;
+
+            // Move towards waypoint
+            const dx = waypoint.x - newX;
+            const dy = (waypoint.y || newY) - newY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < movementSpeed) {
+              // Reached waypoint
+              newX = waypoint.x;
+              newY = waypoint.y || newY;
+
+              if (route.type === 'going_home' && state.waypointIndex === route.waypoints.length - 1) {
+                // Reached end of going_home route - mark for removal
+                charactersToRemove.push(char.id);
+                return char;
+              } else if (route.type === 'just_invited' && state.waypointIndex === route.waypoints.length - 1) {
+                // Finished entrance animation - transition to patrol
+                newRouteStage = 'patrol';
+                newWaypointIndex = 0;
+                newPauseTimer = 0;
+              } else {
+                newWaypointIndex = (state.waypointIndex + 1) % route.waypoints.length;
+                newPauseTimer = 0;
+              }
+            } else {
+              // Move towards waypoint
+              newX += (dx / distance) * movementSpeed;
+              newY += (dy / distance) * movementSpeed;
+            }
+          }
+
+          // Update character movement state
+          if (newWaypointIndex !== state.waypointIndex || newPauseTimer !== state.pauseTimer) {
+            setCharacterMovementState(prevState => ({
+              ...prevState,
+              [char.id]: {
+                waypointIndex: newWaypointIndex,
+                pauseTimer: newPauseTimer
+              }
+            }));
+          }
+
+          return {
+            ...char,
+            x: newX,
+            y: newY,
+            direction: newDirection,
+            isWalking: newIsWalking,
+            routeStage: newRouteStage
+          };
+        });
+
+        // Remove characters that have finished going home
+        return updatedCharacters.filter(char => !charactersToRemove.includes(char.id));
       });
 
-      animationFrameId = requestAnimationFrame(updateNoah);
+      animationFrameId = requestAnimationFrame(updateCharacters);
     };
 
-    animationFrameId = requestAnimationFrame(updateNoah);
+    animationFrameId = requestAnimationFrame(updateCharacters);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [showVNDialogue, vnDialogueType]);
+  }, [placedCharacters, characterMovementState, setPlacedCharacters]);
+
+  // Send character home function
+  const sendCharacterHome = (characterName) => {
+    setPlacedCharacters(prev => {
+      return prev.map(char => {
+        if (char.character === characterName) {
+          // Switch character to "going_home" route stage
+          return {
+            ...char,
+            routeStage: 'going_home'
+          };
+        }
+        return char;
+      });
+    });
+
+    // Reset character movement state to start from beginning of going_home route
+    setCharacterMovementState(prev => {
+      const charId = placedCharacters.find(c => c.character === characterName)?.id;
+      if (charId) {
+        return {
+          ...prev,
+          [charId]: {
+            waypointIndex: 0,
+            pauseTimer: 0
+          }
+        };
+      }
+      return prev;
+    });
+  };
+
+  // Auto-home timer (1 minute for testing)
+  useEffect(() => {
+    const timers = {};
+
+    placedCharacters.forEach(char => {
+      if (char.routeType !== 'going_home') {
+        // Set 1-minute timer for each character to auto-go-home
+        timers[char.id] = setTimeout(() => {
+          console.log(`⏰ 1 minute passed! Sending ${char.character} home...`);
+          sendCharacterHome(char.character);
+        }, 60000); // 60 seconds = 1 minute
+      }
+    });
+
+    return () => {
+      // Clean up timers when characters change or component unmounts
+      Object.values(timers).forEach(timer => clearTimeout(timer));
+    };
+  }, [placedCharacters]);
 
   // Furniture placement handlers
   const handleAddFurniture = () => {
@@ -875,6 +983,48 @@ function Room() {
         margin: '20px auto',
         padding: '0 20px'
       }}>
+        {/* Reset Button */}
+        {placedCharacters.length > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: '10px'
+          }}>
+            <button
+              onClick={() => {
+                // Remove all placed characters
+                placedCharacters.forEach(char => {
+                  removeCharacter(char.character);
+                });
+              }}
+              style={{
+                padding: '8px 16px',
+                background: '#ff5252',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(255, 82, 82, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = '#ff1744';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 12px rgba(255, 82, 82, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = '#ff5252';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 2px 8px rgba(255, 82, 82, 0.3)';
+              }}
+            >
+              🔄 Reset Invited Characters
+            </button>
+          </div>
+        )}
+
         {/* Room container */}
         <div
           onMouseDown={(e) => {
@@ -1429,37 +1579,6 @@ function Room() {
             </div>
           )}
 
-          {/* Noah hitbox visualization */}
-          {showHitbox && (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${noah.x - noah.collisionWidth / 2}px`,
-                top: `${noah.y - noah.collisionHeight / 2 + 10}px`,
-                width: `${noah.collisionWidth}px`,
-                height: `${noah.collisionHeight}px`,
-                border: '2px solid rgba(255, 150, 0, 0.8)',
-                background: 'rgba(255, 150, 0, 0.2)',
-                pointerEvents: 'none',
-                zIndex: 10000
-              }}
-            >
-              <div style={{
-                position: 'absolute',
-                top: '-20px',
-                left: '16px',
-                fontSize: '10px',
-                color: 'orange',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-                background: 'rgba(0, 0, 0, 0.7)',
-                padding: '2px 4px',
-                borderRadius: '4px'
-              }}>
-                ({Math.round(noah.x)}, {Math.round(noah.y)})
-              </div>
-            </div>
-          )}
 
           {/* Drawing preview */}
           {isDrawing && drawStart && currentMouse && (
@@ -1528,68 +1647,85 @@ function Room() {
             )}
           </div>
 
-          {/* Noah sprite */}
-          <div style={{
-            position: 'absolute',
-            left: `${noah.x}px`,
-            top: `${noah.y}px`,
-            transform: 'translate(-50%, -50%)',
-            imageRendering: 'pixelated',
-            pointerEvents: 'none',
-            zIndex: noah.y
-          }}>
-            {/* Gift Reaction */}
-            {giftReaction && giftReaction.character === 'noah' && (
-              <div style={{
-                position: 'absolute',
-                left: '50%',
-                top: '-40px',
-                transform: 'translateX(-50%)',
-                background: 'rgba(0, 0, 0, 0.85)',
-                color: 'white',
-                padding: '8px 14px',
-                borderRadius: '20px',
-                fontSize: '13px',
-                fontWeight: '700',
-                whiteSpace: 'nowrap',
-                zIndex: 10000,
-                animation: 'fadeIn 0.3s ease-out',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-              }}>
-                {giftReaction.reaction} {'❤️'.repeat(giftReaction.points / 50)}
-              </div>
-            )}
+          {/* Render all placed characters */}
+          {placedCharacters.map((char) => {
+            const characterData = {
+              x: char.x,
+              y: char.y,
+              direction: char.direction || 'down',
+              isWalking: char.isWalking || false
+            };
 
-            <img
-              src={noah.direction === 'up'
-                ? '/images/walking-sprites/Noah/Walking/walkback_noah.gif'
-                : noah.direction === 'down'
-                ? '/images/walking-sprites/Noah/Walking/walkfront_noah.gif'
-                : '/images/walking-sprites/Noah/Walking/walkside_noah.gif'}
-              alt="Noah"
-              style={{
-                height: 'auto',
+            const charName = char.character.charAt(0).toUpperCase() + char.character.slice(1);
+            // Noah & Yuwon use "_Walking_", Jaehyun & Minkyu use "_Walk_"
+            const walkPrefix = (char.character === 'jaehyun' || char.character === 'minkyu') ? 'Walk' : 'Walking';
+
+            return (
+              <div key={char.id} style={{
+                position: 'absolute',
+                left: `${characterData.x}px`,
+                top: `${characterData.y}px`,
+                transform: 'translate(-50%, -50%)',
                 imageRendering: 'pixelated',
-                display: noah.isWalking ? 'block' : 'none',
-                transform: noah.direction === 'left' ? 'scaleX(-1)' : 'none'
-              }}
-            />
-            <img
-              src={noah.direction === 'up'
-                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Back_Outfit1animation.gif'
-                : noah.direction === 'down'
-                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Front_Outfit1animation.gif'
-                : '/images/walking-sprites/Noah/Idle/Noah_Idle_Left_Outfit1animation.gif'}
-              alt="Noah idle"
-              style={{
-                height: 'auto',
-                imageRendering: 'pixelated',
-                display: noah.isWalking ? 'none' : 'block',
-                transform: noah.direction === 'left' ? 'scaleX(-1)' : 'none'
-              }}
-            />
-          </div>
+                pointerEvents: 'none',
+                zIndex: characterData.y
+              }}>
+                {/* Gift Reaction */}
+                {giftReaction && giftReaction.character === char.character && (
+                  <div style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '-40px',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    color: 'white',
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    whiteSpace: 'nowrap',
+                    zIndex: 10000,
+                    animation: 'fadeIn 0.3s ease-out',
+                    border: '2px solid rgba(255, 255, 255, 0.4)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                  }}>
+                    {giftReaction.reaction} {'❤️'.repeat(giftReaction.points / 50)}
+                  </div>
+                )}
+
+                {/* Walking sprite */}
+                <img
+                  src={characterData.direction === 'up'
+                    ? `/images/walking-sprites/${charName}/${charName}_${walkPrefix}_Back.gif`
+                    : characterData.direction === 'down'
+                    ? `/images/walking-sprites/${charName}/${charName}_${walkPrefix}_Front.gif`
+                    : `/images/walking-sprites/${charName}/${charName}_${walkPrefix}_Side.gif`}
+                  alt={`${charName} walking`}
+                  style={{
+                    height: 'auto',
+                    imageRendering: 'pixelated',
+                    display: characterData.isWalking ? 'block' : 'none',
+                    transform: characterData.direction === 'left' ? 'scaleX(-1)' : 'none'
+                  }}
+                />
+                {/* Idle sprite */}
+                <img
+                  src={characterData.direction === 'up'
+                    ? `/images/walking-sprites/${charName}/${charName}_Idle_Back.gif`
+                    : characterData.direction === 'down'
+                    ? `/images/walking-sprites/${charName}/${charName}_Idle_Front.gif`
+                    : `/images/walking-sprites/${charName}/${charName}_Idle_Side.gif`}
+                  alt={`${charName} idle`}
+                  style={{
+                    height: 'auto',
+                    imageRendering: 'pixelated',
+                    display: characterData.isWalking ? 'none' : 'block',
+                    transform: characterData.direction === 'left' ? 'scaleX(-1)' : 'none'
+                  }}
+                />
+              </div>
+            );
+          })}
 
           {/* Yuwon sprite with item on head */}
           <div style={{
@@ -1603,15 +1739,8 @@ function Room() {
               const y = yuwonPosition.y;
 
               // Yuwon's z-index is always between furniture_base (50) and furniture_tops (700)
-              // Dynamic based on Y position for proper depth sorting with Noah
-              const baseZ = Math.max(200, Math.min(600, y + 200));
-
-              // Adjust relative to Noah for proper layering
-              if (y < noah.y) {
-                return Math.min(baseZ, noah.y - 1);
-              } else {
-                return Math.max(baseZ, noah.y + 1);
-              }
+              // Dynamic based on Y position for proper depth sorting
+              return Math.max(200, Math.min(600, y + 200));
             })()
           }}>
             {/* Held item on head */}
@@ -1641,10 +1770,10 @@ function Room() {
             {/* Yuwon sprite */}
             <img
               src={direction === 'up'
-                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Backanimation.gif'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Walking_Back.gif'
                 : direction === 'down'
-                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Frontanimation.gif'
-                : '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit1animation.gif'}
+                ? '/images/walking-sprites/Yuwon/Yuwon_Walking_Front.gif'
+                : '/images/walking-sprites/Yuwon/Yuwon_Walking_Side.gif'}
               alt="Yuwon"
               style={{
                 height: 'auto',
@@ -1654,38 +1783,47 @@ function Room() {
               }}
             />
             <img
-              src="/images/walking-sprites/Yuwon/Idle/Yuwon_Idle_Outfit1animation.gif"
+              src={direction === 'up'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Idle_Back.gif'
+                : direction === 'down'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Idle_Front.gif'
+                : '/images/walking-sprites/Yuwon/Yuwon_Idle_Side.gif'}
               alt="Yuwon idle"
               style={{
                 height: 'auto',
                 imageRendering: 'pixelated',
-                display: isWalking ? 'none' : 'block'
+                display: isWalking ? 'none' : 'block',
+                transform: direction === 'left' ? 'scaleX(-1)' : 'none'
               }}
             />
           </div>
 
           {/* E prompt for Noah */}
-          {nearbyCharacter === 'noah' && !showVNDialogue && (
-            <div style={{
-              position: 'absolute',
-              left: '50%',
-              top: `${noah.y - 30}px`,
-              transform: 'translateX(-50%)',
-              background: 'rgba(0, 0, 0, 0.8)',
-              color: 'white',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '11px',
-              fontWeight: '700',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-              zIndex: 10000,
-              animation: 'bounce 1s ease-in-out infinite',
-              border: '2px solid rgba(255, 255, 255, 0.3)'
-            }}>
-              Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to {heldItem ? '🎁 Gift' : 'Talk'}
-            </div>
-          )}
+          {nearbyCharacter === 'noah' && !showVNDialogue && (() => {
+            const noahChar = placedCharacters.find(c => c.character === 'noah');
+            if (!noahChar) return null;
+            return (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: `${noahChar.y - 30}px`,
+                transform: 'translateX(-50%)',
+                background: 'rgba(0, 0, 0, 0.8)',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 10000,
+                animation: 'bounce 1s ease-in-out infinite',
+                border: '2px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                Press <span style={{ background: 'rgba(255, 255, 255, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '900' }}>E</span> to {heldItem ? '🎁 Gift' : 'Talk'}
+              </div>
+            );
+          })()}
 
           {/* E prompt for Fridge */}
           {nearbyCharacter === 'fridge' && !showFridgeModal && (
@@ -1820,6 +1958,8 @@ function Room() {
                     ? "What do you want?"
                     : vnDialogueType === 'noah' && dialogueMode === 'talk'
                     ? noahMessages[currentNoahMessage]
+                    : vnDialogueType === 'noah' && dialogueMode === 'going_home'
+                    ? "Are you telling your boss to go home? How rude."
                     : vnDialogueType === 'stove'
                     ? "I'm feeling like cooking! ✨"
                     : vnDialogueType === 'fridge'
@@ -1879,7 +2019,52 @@ function Room() {
                           🎁 Gift {heldItem.name}
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setDialogueMode('going_home');
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #ff5252 0%, #c62828 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                      >
+                        🚪 Go Home
+                      </button>
                     </>
+                  )}
+
+                  {vnDialogueType === 'noah' && dialogueMode === 'going_home' && (
+                    <button
+                      onClick={() => {
+                        sendCharacterHome('noah');
+                        setShowVNDialogue(false);
+                        setDialogueMode('menu');
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #ff5252 0%, #c62828 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+                      onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                    >
+                      👋 *Noah leaves*
+                    </button>
                   )}
 
                   {vnDialogueType !== 'noah' && (
@@ -2344,6 +2529,130 @@ function Room() {
           </div>
         </div>
       )}
+
+      {/* Character Invitation Section - Below Room */}
+      <div className="content" style={{ marginTop: '40px' }}>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          <div style={{
+            background: '#fff0f5',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <div style={{ fontSize: '14px', color: '#666' }}>
+              🏠 <span style={{ fontWeight: '600', color: '#333' }}>Yuwon's Room</span>
+            </div>
+          </div>
+
+          <h3 style={{ fontSize: '18px', color: '#e91e63', marginBottom: '15px' }}>
+            ✨ Invite Characters
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+            {[
+              { name: 'yuwon', displayName: 'Yuwon', unlocked: true, color: '#5e35b1' },
+              { name: 'jaehyun', displayName: 'Jaehyun', unlocked: true, color: '#2e7d32' },
+              { name: 'minkyu', displayName: 'Minkyu', unlocked: true, color: '#c2185b' },
+              { name: 'noah', displayName: 'Noah', unlocked: true, color: '#f57c00' }
+            ].map(({ name, displayName, unlocked, color }) => (
+              <div key={name} style={{
+                padding: '20px',
+                background: unlocked ? '#fafafa' : '#f5f5f5',
+                borderRadius: '12px',
+                opacity: unlocked ? 1 : 0.4,
+                textAlign: 'center',
+                border: name === 'noah' ? '2px solid #e91e63' : '2px solid #e0e0e0'
+              }}>
+                <img
+                  src={`/images/${displayName}_1.png`}
+                  alt={displayName}
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    objectFit: 'contain',
+                    marginBottom: '10px',
+                    border: `3px solid ${color}`,
+                    background: 'white',
+                    padding: '5px'
+                  }}
+                />
+                <h4 style={{
+                  fontSize: '16px',
+                  textTransform: 'capitalize',
+                  marginBottom: '8px',
+                  color: '#333'
+                }}>
+                  {displayName}
+                </h4>
+                {isCharacterPlaced(name) ? (
+                  <button
+                    onClick={() => {
+                      if (removeCharacter(name)) {
+                        alert(`👋 ${displayName} has left the room!`);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#ff5252',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      width: '100%'
+                    }}
+                  >
+                    👋 Remove
+                  </button>
+                ) : (
+                  <button
+                    disabled={!unlocked}
+                    onClick={() => {
+                      if (unlocked) {
+                        if (placeCharacter(name)) {
+                          alert(`✨ ${displayName} has joined the room!`);
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: unlocked ? '#4caf50' : '#999',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: unlocked ? 'pointer' : 'not-allowed',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      width: '100%',
+                      opacity: unlocked ? 1 : 0.5
+                    }}
+                  >
+                    {unlocked ? '📍 Invite' : '🔒 Locked'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            background: '#e8f5e9',
+            borderRadius: '8px',
+            fontSize: '13px',
+            color: '#666',
+            textAlign: 'center'
+          }}>
+            ✨ <strong style={{ color: '#2e7d32' }}>Phase 2 Active!</strong> Invite characters to hang out in your room! They'll appear in the room and you can interact with them.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

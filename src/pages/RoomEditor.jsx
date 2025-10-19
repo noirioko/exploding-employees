@@ -1523,10 +1523,10 @@ function RoomEditor() {
           }}>
             <img
               src={noah.direction === 'up'
-                ? '/images/walking-sprites/Noah/Walking/walkback_noah.gif'
+                ? '/images/walking-sprites/Noah/Noah_Walking_Back.gif'
                 : noah.direction === 'down'
-                ? '/images/walking-sprites/Noah/Walking/walkfront_noah.gif'
-                : '/images/walking-sprites/Noah/Walking/walkside_noah.gif'}
+                ? '/images/walking-sprites/Noah/Noah_Walking_Front.gif'
+                : '/images/walking-sprites/Noah/Noah_Walking_Side.gif'}
               alt="Noah"
               style={{
                 height: 'auto',
@@ -1537,10 +1537,10 @@ function RoomEditor() {
             />
             <img
               src={noah.direction === 'up'
-                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Back_Outfit1animation.gif'
+                ? '/images/walking-sprites/Noah/Noah_Idle_Back.gif'
                 : noah.direction === 'down'
-                ? '/images/walking-sprites/Noah/Idle/Noah_Idle_Front_Outfit1animation.gif'
-                : '/images/walking-sprites/Noah/Idle/Noah_Idle_Left_Outfit1animation.gif'}
+                ? '/images/walking-sprites/Noah/Noah_Idle_Front.gif'
+                : '/images/walking-sprites/Noah/Noah_Idle_Side.gif'}
               alt="Noah idle"
               style={{
                 height: 'auto',
@@ -1601,10 +1601,10 @@ function RoomEditor() {
             {/* Yuwon sprite */}
             <img
               src={direction === 'up'
-                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Backanimation.gif'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Walking_Back.gif'
                 : direction === 'down'
-                ? '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit 1_Frontanimation.gif'
-                : '/images/walking-sprites/Yuwon/Walking/Yuwon_Walking_Outfit1animation.gif'}
+                ? '/images/walking-sprites/Yuwon/Yuwon_Walking_Front.gif'
+                : '/images/walking-sprites/Yuwon/Yuwon_Walking_Side.gif'}
               alt="Yuwon"
               style={{
                 height: 'auto',
@@ -1614,12 +1614,17 @@ function RoomEditor() {
               }}
             />
             <img
-              src="/images/walking-sprites/Yuwon/Idle/Yuwon_Idle_Outfit1animation.gif"
+              src={direction === 'up'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Idle_Back.gif'
+                : direction === 'down'
+                ? '/images/walking-sprites/Yuwon/Yuwon_Idle_Front.gif'
+                : '/images/walking-sprites/Yuwon/Yuwon_Idle_Side.gif'}
               alt="Yuwon idle"
               style={{
                 height: 'auto',
                 imageRendering: 'pixelated',
-                display: isWalking ? 'none' : 'block'
+                display: isWalking ? 'none' : 'block',
+                transform: direction === 'left' ? 'scaleX(-1)' : 'none'
               }}
             />
           </div>

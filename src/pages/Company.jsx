@@ -9,6 +9,24 @@ function Company() {
   const [activeTab, setActiveTab] = useState('achievement');
   const [selectedCouple, setSelectedCouple] = useState('noah-yuwon');
   const [showDesktop, setShowDesktop] = useState(false);
+  const [isMinimizing, setIsMinimizing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleMinimize = () => {
+    setIsMinimizing(true);
+    setTimeout(() => {
+      setShowDesktop(true);
+      setIsMinimizing(false);
+    }, 400); // Match animation duration
+  };
+
+  const handleRestore = () => {
+    setIsRestoring(true);
+    setTimeout(() => {
+      setShowDesktop(false);
+      setIsRestoring(false);
+    }, 400); // Match animation duration
+  };
 
   // Mode labels for display
   const modeLabels = {
@@ -1124,8 +1142,19 @@ function Company() {
       </div>
 
       <div className="content">
-        {/* Browser-style window */}
-        <div style={{ background: 'white', borderRadius: '15px', overflow: 'hidden', border: '4px solid #d4c5f0' }}>
+        {showDesktop && !isRestoring ? (
+          <YuwonDesktop onClose={handleRestore} />
+        ) : (
+          /* Browser-style window */
+          <div style={{
+            background: 'white',
+            borderRadius: '15px',
+            overflow: 'hidden',
+            border: '4px solid #d4c5f0',
+            animation: isMinimizing ? 'minimizeToTaskbar 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards' :
+                      isRestoring ? 'restoreFromTaskbar 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards' : 'none',
+            transformOrigin: 'bottom left'
+          }}>
 
           {/* Browser Tab Bar (Pink!) */}
           <div style={{
@@ -1204,7 +1233,7 @@ function Company() {
                 cursor: 'not-allowed'
               }} title="Maximize" />
               <div
-                onClick={() => setShowDesktop(true)}
+                onClick={handleMinimize}
                 style={{
                   width: '14px',
                   height: '14px',
@@ -1361,18 +1390,13 @@ function Company() {
 
           {/* Tab content */}
           <div style={{ padding: '20px', background: 'white' }}>
-            {showDesktop ? (
-              <YuwonDesktop onClose={() => setShowDesktop(false)} />
-            ) : (
-              <>
-                {activeTab === 'achievement' && renderAchievement()}
-                {activeTab === 'promotion' && renderPromotion()}
-                {activeTab === 'moral' && renderMoral()}
-                {activeTab === 'finance' && renderFinance()}
-              </>
-            )}
+            {activeTab === 'achievement' && renderAchievement()}
+            {activeTab === 'promotion' && renderPromotion()}
+            {activeTab === 'moral' && renderMoral()}
+            {activeTab === 'finance' && renderFinance()}
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="footer">
@@ -1434,6 +1458,28 @@ function Company() {
           50% {
             opacity: 1;
             transform: scale(1.2);
+          }
+        }
+
+        @keyframes minimizeToTaskbar {
+          0% {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(0.1) translateY(400px) translateX(-400px);
+            opacity: 0;
+          }
+        }
+
+        @keyframes restoreFromTaskbar {
+          0% {
+            transform: scale(0.1) translateY(400px) translateX(-400px);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1) translateY(0);
+            opacity: 1;
           }
         }
       `}</style>
