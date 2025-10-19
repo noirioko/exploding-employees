@@ -1,11 +1,14 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { rollCard } from '../data/cards';
-import { ENERGY_REWARDS, CARD_DROP_CHANCE } from '../constants/gameConstants';
+import { ENERGY_REWARDS, IMPOSSIBLE_TASK_REWARDS, CARD_DROP_CHANCE } from '../constants/gameConstants';
+import { useNotification } from './NotificationContext';
 
 const AppContext = createContext();
 
 // Unified task system with exp and currency
 export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee }) => {
+  const { addNotification } = useNotification();
+
   // Load data from localStorage
   const loadFromStorage = (key, defaultValue) => {
     try {
@@ -58,6 +61,12 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     startDate: new Date().toISOString()
   }));
 
+  // Wishlist - short-term wants ($20-500)
+  const [wishlistItems, setWishlistItems] = useState(() => loadFromStorage('wishlistItems', []));
+
+  // Dream Planner - long-term goals ($1000+)
+  const [dreamGoals, setDreamGoals] = useState(() => loadFromStorage('dreamGoals', []));
+
   // Minkyu Life Mode - affects how finance tracking is evaluated
   // 'normal' = track both income & spending (default)
   // 'no-buy' = focus on avoiding spending
@@ -85,6 +94,25 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     noah: 0,
     jaehyun: 0,
     minkyu: 0
+  }));
+
+  // Character placement in room (Phase 2)
+  const [placedCharacters, setPlacedCharacters] = useState(() => loadFromStorage('placedCharacters', []));
+
+  // Character AI routes and behaviors
+  const [characterRoutes, setCharacterRoutes] = useState(() => loadFromStorage('characterRoutes', {}));
+
+  // Achievement system for games (ShootEmUp endings, etc.)
+  const [gameAchievements, setGameAchievements] = useState(() => loadFromStorage('gameAchievements', {
+    shootEmUp: {
+      gameOver: false,    // Overworked ending
+      victory: false,     // Work Complete ending
+      slacked: false      // Slacker ending
+    },
+    employeeInvaders: {
+      gameOver: false,    // Defeated ending
+      victory: false      // Victory ending
+    }
   }));
 
   // Save to localStorage whenever state changes
@@ -137,6 +165,14 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   }, [budgetGoals]);
 
   useEffect(() => {
+    localStorage.setItem('wishlistItems', JSON.stringify(wishlistItems));
+  }, [wishlistItems]);
+
+  useEffect(() => {
+    localStorage.setItem('dreamGoals', JSON.stringify(dreamGoals));
+  }, [dreamGoals]);
+
+  useEffect(() => {
     localStorage.setItem('minkyuMode', JSON.stringify(minkyuMode));
   }, [minkyuMode]);
 
@@ -175,6 +211,18 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
   useEffect(() => {
     localStorage.setItem('friendshipPoints', JSON.stringify(friendshipPoints));
   }, [friendshipPoints]);
+
+  useEffect(() => {
+    localStorage.setItem('placedCharacters', JSON.stringify(placedCharacters));
+  }, [placedCharacters]);
+
+  useEffect(() => {
+    localStorage.setItem('characterRoutes', JSON.stringify(characterRoutes));
+  }, [characterRoutes]);
+
+  useEffect(() => {
+    localStorage.setItem('gameAchievements', JSON.stringify(gameAchievements));
+  }, [gameAchievements]);
 
   // Check if date has changed and clean up today's completed tasks
   useEffect(() => {
@@ -242,15 +290,20 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     if (!task) return;
 
     // Calculate exp and won based on energy level
+    // Impossible tasks get special higher rewards
     const energyLevel = task.energy || 'low';
-    const rewards = ENERGY_REWARDS[energyLevel] || ENERGY_REWARDS.low;
+    const isImpossible = task.taskType === 'impossible';
+    const rewards = isImpossible
+      ? (IMPOSSIBLE_TASK_REWARDS[energyLevel] || IMPOSSIBLE_TASK_REWARDS.low)
+      : (ENERGY_REWARDS[energyLevel] || ENERGY_REWARDS.low);
     const exp = rewards.exp;
     const wonEarned = rewards.won;
 
     // Card drop chance
     const cardDropChance = Math.random();
+    let droppedCard = null;
     if (cardDropChance < CARD_DROP_CHANCE) {
-      const droppedCard = rollCard();
+      droppedCard = rollCard();
       // Only add if not already collected
       if (!collectedCards.find(c => c.id === droppedCard.id)) {
         setCollectedCards(prev => [...prev, droppedCard]);
@@ -281,6 +334,16 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
         }
       }));
     }
+
+    // Send notification for task completion
+    addNotification({
+      type: droppedCard?.rarity === 'cursed' ? 'cursed' : droppedCard ? 'reward' : 'success',
+      title: 'Task Completed!',
+      message: `Finished "${task.text}"`,
+      exp: exp,
+      yuCash: wonEarned,
+      card: droppedCard
+    });
 
     deleteTask(id);
   };
@@ -320,12 +383,28 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
       }));
     }
 
+    // Send notification for habit completion
+    addNotification({
+      type: 'success',
+      title: 'Habit Logged!',
+      message: `Completed "${habit.text}"`,
+      exp: exp,
+      yuCash: wonEarned
+    });
+
     // Don't delete the habit - it stays permanent!
   };
 
   // Delete a completed task from the record
   const deleteCompletedTask = (id) => {
     setCompletedTasks(prev => prev.filter(task => task.id !== id));
+  };
+
+  // Update a completed task
+  const updateCompletedTask = (id, updates) => {
+    setCompletedTasks(prev => prev.map(task =>
+      task.id === id ? { ...task, ...updates } : task
+    ));
   };
 
   // Get tasks completed on a specific date
@@ -354,6 +433,12 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
 
   const deleteFakeProductivity = (id) => {
     setFakeProductivity(prev => prev.filter(item => item.id !== id));
+  };
+
+  const updateFakeProductivity = (id, updates) => {
+    setFakeProductivity(prev => prev.map(item =>
+      item.id === id ? { ...item, ...updates } : item
+    ));
   };
 
   // Convert accumulated won to YuCash (paycheck)
@@ -1037,6 +1122,187 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     return true;
   };
 
+  // Character placement functions
+  const placeCharacter = (character) => {
+    // Check if character already placed
+    const alreadyPlaced = placedCharacters.some(char => char.character === character);
+    if (alreadyPlaced) {
+      return false; // Already placed
+    }
+
+    // Default spawn position (door entrance - will be overridden by route)
+    const newChar = {
+      character: character,
+      x: 44,
+      y: 412,
+      routeStage: 'just_invited', // Start with entrance animation
+      id: `${character}-${Date.now()}`
+    };
+    setPlacedCharacters(prev => [...prev, newChar]);
+    return true;
+  };
+
+  const removeCharacter = (characterName) => {
+    setPlacedCharacters(prev => prev.filter(c => c.character !== characterName));
+    return true;
+  };
+
+  const isCharacterPlaced = (character) => {
+    return placedCharacters.some(char => char.character === character);
+  };
+
+  const updateCharacterPosition = (characterId, x, y) => {
+    setPlacedCharacters(prev => prev.map(char =>
+      char.id === characterId ? { ...char, x, y } : char
+    ));
+  };
+
+  // Wishlist functions
+  const addWishlistItem = (item) => {
+    const newItem = {
+      id: Date.now(),
+      ...item,
+      addedAt: new Date().toISOString(),
+      purchased: false
+    };
+    setWishlistItems(prev => [...prev, newItem]);
+  };
+
+  const deleteWishlistItem = (id) => {
+    setWishlistItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const buyWishlistItem = (id) => {
+    const item = wishlistItems.find(i => i.id === id);
+    if (!item) return false;
+
+    // Check if user has enough YuCash
+    if (yuCash < item.price) {
+      return { success: false, message: 'Not enough YuCash!' };
+    }
+
+    // Deduct from YuCash
+    setYuCash(prev => prev - item.price);
+
+    // Mark as purchased
+    setWishlistItems(prev => prev.map(i =>
+      i.id === id ? { ...i, purchased: true, purchasedAt: new Date().toISOString(), action: 'bought' } : i
+    ));
+
+    return { success: true, message: `Bought ${item.name} for ${item.price}₩!` };
+  };
+
+  const resistWishlistItem = (id) => {
+    const item = wishlistItems.find(i => i.id === id);
+    if (!item) return false;
+
+    // Add the money to YuCash as savings!
+    setYuCash(prev => prev + item.price);
+
+    // Give bonus EXP for willpower! (50% of item price as EXP bonus)
+    const bonusExp = Math.ceil(item.price * 0.5);
+    setTotalExp(prev => prev + bonusExp);
+
+    // Mark as resisted (special status)
+    setWishlistItems(prev => prev.map(i =>
+      i.id === id ? { ...i, purchased: true, purchasedAt: new Date().toISOString(), action: 'resisted' } : i
+    ));
+
+    return { success: true, message: `Resisted! Saved ${item.price}₩ and earned ${bonusExp} EXP!`, exp: bonusExp };
+  };
+
+  const postponeWishlistItem = (id) => {
+    const item = wishlistItems.find(i => i.id === id);
+    if (!item) return false;
+
+    // Mark as postponed (maybe later)
+    setWishlistItems(prev => prev.map(i =>
+      i.id === id ? { ...i, purchased: true, purchasedAt: new Date().toISOString(), action: 'postponed' } : i
+    ));
+
+    return { success: true, message: `Postponed ${item.name} for later!` };
+  };
+
+  const convertWishlistToDream = (wishlistId, targetDate) => {
+    const item = wishlistItems.find(i => i.id === wishlistId);
+    if (!item) return false;
+
+    // Create a new dream goal from the wishlist item
+    const newDream = {
+      id: Date.now(),
+      name: item.name,
+      targetAmount: item.price,
+      targetDate: targetDate,
+      imageUrl: item.url || '',
+      createdAt: new Date().toISOString(),
+      currentSavings: 0,
+      milestones: [],
+      convertedFromWishlist: true
+    };
+
+    setDreamGoals(prev => [...prev, newDream]);
+
+    // Remove from wishlist
+    setWishlistItems(prev => prev.filter(i => i.id !== wishlistId));
+
+    return { success: true, dream: newDream };
+  };
+
+  // Keep old function for backwards compatibility
+  const markWishlistPurchased = (id) => {
+    return buyWishlistItem(id);
+  };
+
+  // Dream Planner functions
+  const addDreamGoal = (dream) => {
+    const newDream = {
+      id: Date.now(),
+      ...dream,
+      createdAt: new Date().toISOString(),
+      currentSavings: 0,
+      milestones: []
+    };
+    setDreamGoals(prev => [...prev, newDream]);
+  };
+
+  const updateDreamGoal = (id, updates) => {
+    setDreamGoals(prev => prev.map(dream =>
+      dream.id === id ? { ...dream, ...updates } : dream
+    ));
+  };
+
+  const deleteDreamGoal = (id) => {
+    setDreamGoals(prev => prev.filter(dream => dream.id !== id));
+  };
+
+  const addDreamSavings = (id, amount) => {
+    setDreamGoals(prev => prev.map(dream =>
+      dream.id === id ? { ...dream, currentSavings: dream.currentSavings + amount } : dream
+    ));
+  };
+
+  // Unlock game achievement
+  const unlockAchievement = (game, achievement) => {
+    setGameAchievements(prev => ({
+      ...prev,
+      [game]: {
+        ...prev[game],
+        [achievement]: true
+      }
+    }));
+  };
+
+  // Check if achievement is unlocked
+  const isAchievementUnlocked = (game, achievement) => {
+    return gameAchievements[game]?.[achievement] || false;
+  };
+
+  // Get all unlocked achievements for a game
+  const getUnlockedAchievements = (game) => {
+    const gameAchs = gameAchievements[game] || {};
+    return Object.keys(gameAchs).filter(key => gameAchs[key]);
+  };
+
   // Reset all data
   const resetAllData = () => {
     // Clear localStorage
@@ -1073,6 +1339,7 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
       jaehyun: 0,
       minkyu: 0
     });
+    setPlacedCharacters([]);
     setLastDate(new Date().toDateString());
     setBudgetGoals({
       period: 'monthly',
@@ -1080,7 +1347,20 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
       spendingBudget: 0,
       startDate: new Date().toISOString()
     });
+    setWishlistItems([]);
+    setDreamGoals([]);
     setMinkyuMode('normal');
+    setGameAchievements({
+      shootEmUp: {
+        gameOver: false,
+        victory: false,
+        slacked: false
+      },
+      employeeInvaders: {
+        gameOver: false,
+        victory: false
+      }
+    });
   };
 
   const value = {
@@ -1113,6 +1393,7 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     updateTask,
     deleteTask,
     deleteCompletedTask,
+    updateCompletedTask,
     completeTask,
     logHabit,
     getTasksByDate,
@@ -1120,6 +1401,7 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     getTasksByType,
     addFakeProductivity,
     deleteFakeProductivity,
+    updateFakeProductivity,
     givePaycheck,
     addHydration,
     getTodaysHydration,
@@ -1144,8 +1426,31 @@ export const AppProvider = ({ children, floatingEmployee, setFloatingEmployee })
     resetAllData,
     budgetGoals,
     setBudgetGoals,
+    wishlistItems,
+    addWishlistItem,
+    deleteWishlistItem,
+    markWishlistPurchased,
+    buyWishlistItem,
+    resistWishlistItem,
+    postponeWishlistItem,
+    convertWishlistToDream,
+    dreamGoals,
+    addDreamGoal,
+    updateDreamGoal,
+    deleteDreamGoal,
+    addDreamSavings,
     minkyuMode,
     setMinkyuMode,
+    placedCharacters,
+    setPlacedCharacters,
+    placeCharacter,
+    removeCharacter,
+    isCharacterPlaced,
+    updateCharacterPosition,
+    gameAchievements,
+    unlockAchievement,
+    isAchievementUnlocked,
+    getUnlockedAchievements,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

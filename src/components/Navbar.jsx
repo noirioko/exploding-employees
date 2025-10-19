@@ -15,8 +15,8 @@ function Navbar() {
         </Link>
 
         <Link to="/record" className={`nav-item ${isActive('/record') ? 'active' : ''}`}>
-          <span className="nav-label">RECORD</span>
-          <img src="/images/ui/minkyu_record_icon.png" alt="Record" className="nav-icon" />
+          <span className="nav-label">DIARY</span>
+          <img src="/images/ui/minkyu_record_icon.png" alt="Diary" className="nav-icon" />
         </Link>
 
         <Link to="/company" className={`nav-item ${isActive('/company') ? 'active' : ''}`}>
